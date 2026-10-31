@@ -70,7 +70,8 @@ when `PROVIDER_FIXTURES_DIR` is set (never in production).
 ## Known limitations
 
 - No email verification or password reset (v1 scope).
-- Flights/Stay/Activities/Transport/Itinerary/Budget/Log tabs are stubs until
-  their build phases land.
+- Flights, Stay, and Activities are live (Google Flights page reader +
+  SerpApi Google Hotels/Maps, or manual entry). Transport, Itinerary,
+  Budget, and Log tabs are stubs until their build phases land.
 - Invite links are shown once; revocation is manual.
 - Login throttling is in-memory (per server process).

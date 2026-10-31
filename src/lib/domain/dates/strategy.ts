@@ -37,6 +37,11 @@ export type DateStrategy =
 
 export type DatePair = { depart: string; back: string | null };
 
+/** ISO date + n days → ISO date. */
+export function addDaysISO(iso: string, days: number): string {
+  return DateTime.fromISO(iso).plus({ days }).toFormat('yyyy-MM-dd');
+}
+
 export type CandidatePairsResult =
   | { ok: true; pairs: DatePair[] }
   | { ok: false; error: string; count: number };

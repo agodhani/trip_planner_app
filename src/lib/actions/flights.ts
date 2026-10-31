@@ -3,10 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireTripRole } from '@/lib/auth/guards';
-import { NotFoundError } from '@/lib/services/access';
 import { startScan } from '@/lib/services/flights';
-import { addOption, deleteOption, setOptionStatus, vote } from '@/lib/services/options';
-import { addComment } from '@/lib/services/comments';
+import { addOption } from '@/lib/services/options';
 import type { ActionState } from './people';
 
 export async function startScanAction(formData: FormData): Promise<void> {
@@ -34,50 +32,6 @@ export async function shortlistFlightAction(formData: FormData): Promise<void> {
     bookingUrl: itinerary.bookingUrl,
   });
   revalidatePath(`/trips/${tripId}/flights`);
-}
-
-export async function optionStatusAction(formData: FormData): Promise<void> {
-  const tripId = z.string().uuid().parse(formData.get('tripId'));
-  const optionId = z.string().uuid().parse(formData.get('optionId'));
-  const status = z.enum(['shortlisted', 'selected', 'booked', 'rejected']).parse(formData.get('status'));
-  const bookingRef = (formData.get('bookingRef') as string) || null;
-  const { user } = await requireTripRole(tripId, 'editor');
-  await setOptionStatus(user, tripId, optionId, status, bookingRef);
-  revalidatePath(`/trips/${tripId}/flights`);
-}
-
-export async function deleteOptionAction(formData: FormData): Promise<void> {
-  const tripId = z.string().uuid().parse(formData.get('tripId'));
-  const optionId = z.string().uuid().parse(formData.get('optionId'));
-  const { user } = await requireTripRole(tripId, 'editor');
-  try {
-    await deleteOption(user, tripId, optionId);
-  } catch (err) {
-    if (err instanceof NotFoundError) return;
-    throw err;
-  }
-  revalidatePath(`/trips/${tripId}/flights`);
-}
-
-export async function voteAction(formData: FormData): Promise<void> {
-  const tripId = z.string().uuid().parse(formData.get('tripId'));
-  const optionId = z.string().uuid().parse(formData.get('optionId'));
-  const value = z.union([z.literal(-1), z.literal(0), z.literal(1)]).parse(Number(formData.get('value')));
-  const { user } = await requireTripRole(tripId, 'viewer');
-  await vote(user, tripId, optionId, value);
-  revalidatePath(`/trips/${tripId}/flights`);
-}
-
-export async function optionCommentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const tripId = String(formData.get('tripId') ?? '');
-  const optionId = z.string().uuid().parse(formData.get('optionId'));
-  const body = String(formData.get('body') ?? '').trim();
-  if (!body) return { error: 'Comment cannot be empty' };
-  if (body.length > 4000) return { error: 'Comment is too long' };
-  const { user } = await requireTripRole(tripId, 'viewer');
-  await addComment(user, tripId, body, optionId);
-  revalidatePath(`/trips/${tripId}/flights`);
-  return {};
 }
 
 export async function manualFlightAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

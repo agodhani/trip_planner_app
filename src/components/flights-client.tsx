@@ -3,9 +3,9 @@
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useRef, useState } from 'react';
 import {
-  deleteOptionAction, manualFlightAction, optionCommentAction,
-  optionStatusAction, shortlistFlightAction, startScanAction, voteAction,
+  manualFlightAction, shortlistFlightAction, startScanAction,
 } from '@/lib/actions/flights';
+import { ShortlistedOptions } from '@/components/shortlisted-options';
 import type { ActionState } from '@/lib/actions/people';
 import { passesWindow } from '@/lib/domain/dates/windows';
 
@@ -126,7 +126,6 @@ export function FlightsClient({
   const [showAllReturns, setShowAllReturns] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [mState, mAction] = useActionState<ActionState, FormData>(manualFlightAction, {});
-  const [cState, cAction] = useActionState<ActionState, FormData>(optionCommentAction, {});
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [stale, setStale] = useState(false);
 
@@ -356,75 +355,7 @@ export function FlightsClient({
         </section>
       )}
 
-      {options.length > 0 && (
-        <section className={card}>
-          <h2 className="mb-3 font-semibold">Shortlisted flights</h2>
-          <ul className="flex flex-col gap-4">
-            {options.map((o) => (
-              <li key={o.id} className="rounded-lg border border-neutral-200 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-medium">{o.title}
-                      <span className="ml-2 rounded bg-neutral-100 px-1.5 text-xs">{o.status}</span>
-                      {o.source === 'manual' && <span className="ml-1 rounded bg-neutral-100 px-1.5 text-xs">manual</span>}
-                    </p>
-                    <p className="text-xs text-neutral-500">
-                      {o.subtitle}
-                      {o.price !== null && ` · $${Math.round(o.price)} ${o.currency ?? ''}`}
-                      {o.bookingRef && ` · conf ${o.bookingRef}`}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <form action={voteAction}>
-                      <input type="hidden" name="tripId" value={tripId} /><input type="hidden" name="optionId" value={o.id} /><input type="hidden" name="value" value="1" />
-                      <button className={btn2} type="submit" aria-label="Vote up">+{o.votes.voters.filter((v) => v.value === 1).length}</button>
-                    </form>
-                    <form action={voteAction}>
-                      <input type="hidden" name="tripId" value={tripId} /><input type="hidden" name="optionId" value={o.id} /><input type="hidden" name="value" value="-1" />
-                      <button className={btn2} type="submit" aria-label="Vote down">−{o.votes.voters.filter((v) => v.value === -1).length}</button>
-                    </form>
-                    {canEdit && o.status !== 'selected' && o.status !== 'booked' && (
-                      <form action={optionStatusAction}>
-                        <input type="hidden" name="tripId" value={tripId} /><input type="hidden" name="optionId" value={o.id} /><input type="hidden" name="status" value="selected" />
-                        <button className={btn} type="submit">Select</button>
-                      </form>
-                    )}
-                    {canEdit && o.status === 'selected' && (
-                      <form action={optionStatusAction} className="flex gap-1">
-                        <input type="hidden" name="tripId" value={tripId} /><input type="hidden" name="optionId" value={o.id} /><input type="hidden" name="status" value="booked" />
-                        <input name="bookingRef" placeholder="Conf #" className={`${inp} w-24`} />
-                        <button className={btn} type="submit">Mark booked</button>
-                      </form>
-                    )}
-                    {canEdit && (
-                      <form action={deleteOptionAction}>
-                        <input type="hidden" name="tripId" value={tripId} /><input type="hidden" name="optionId" value={o.id} />
-                        <button className={btn2} type="submit">Remove</button>
-                      </form>
-                    )}
-                    {o.bookingUrl && <a href={o.bookingUrl} target="_blank" rel="noopener noreferrer" className={btn2}>Book</a>}
-                  </div>
-                </div>
-                {o.votes.voters.length > 0 && (
-                  <p className="mt-1 text-xs text-neutral-500">
-                    {o.votes.voters.map((v) => `${v.name} ${v.value === 1 ? '+' : '−'}`).join(', ')} · score {o.votes.score}
-                  </p>
-                )}
-                {o.comments.map((c) => (
-                  <p key={c.id} className="mt-1 text-xs"><span className="font-medium">{c.author}:</span> {c.body}</p>
-                ))}
-                <form action={cAction} className="mt-2 flex gap-2">
-                  <input type="hidden" name="tripId" value={tripId} />
-                  <input type="hidden" name="optionId" value={o.id} />
-                  <input name="body" placeholder="Comment…" aria-label="Option comment" className={`${inp} flex-1`} />
-                  <button className={btn2} type="submit">Post</button>
-                </form>
-                {cState.error && <p className="text-xs text-red-600">{cState.error}</p>}
-                          </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <ShortlistedOptions tripId={tripId} section="flights" title="Shortlisted flights" canEdit={canEdit} options={options} />
     </div>
   );
 }

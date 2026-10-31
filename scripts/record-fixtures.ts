@@ -50,6 +50,28 @@ async function main() {
       }
     }
   }
+
+  // SerpApi fixtures for the E2E stay/activities scenario (uses real quota —
+  // 2 searches + the free account endpoint).
+  const sa = process.env.SERPAPI_FIXTURES !== '0';
+  if (sa && process.env.SERPAPI_API_KEY) {
+    const { getSerpApiAccount } = await import('../src/lib/providers/serpapi/account');
+    const { searchHotels } = await import('../src/lib/providers/serpapi/hotels');
+    const { searchMapsPlaces } = await import('../src/lib/providers/serpapi/maps');
+    const account = await getSerpApiAccount();
+    console.log('serpapi account:', account.status);
+    const h = await searchHotels({
+      q: 'Lisbon', checkIn: '2026-12-04', checkOut: '2026-12-07',
+      adults: 1, currency: 'USD',
+    });
+    console.log(`hotels Lisbon: ${h.lodgings.length} properties`);
+    const m = await searchMapsPlaces({
+      q: 'museums', lat: 38.7077507, lon: -9.1365919, zoom: 13,
+    });
+    console.log(`maps museums: ${m.places.length} places`);
+  } else if (sa) {
+    console.log('SERPAPI_API_KEY not set — skipping SerpApi fixtures');
+  }
 }
 
 main().catch((err) => {

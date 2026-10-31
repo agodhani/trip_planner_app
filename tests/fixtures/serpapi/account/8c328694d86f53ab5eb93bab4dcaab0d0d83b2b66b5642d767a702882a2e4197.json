@@ -1,0 +1,17 @@
+{
+  "account_id": "6ae6174197be1f48c25b9ac5",
+  "account_email": "agodhani2021@gmail.com",
+  "account_status": "Active",
+  "plan_id": "free",
+  "plan_name": "Free Plan",
+  "plan_monthly_price": 0,
+  "plan_renewal_date": "2026-11-30",
+  "searches_per_month": 250,
+  "plan_searches_left": 250,
+  "extra_credits": 0,
+  "total_searches_left": 250,
+  "this_month_usage": 0,
+  "this_hour_searches": 0,
+  "last_hour_searches": 0,
+  "account_rate_limit_per_hour": 250
+}

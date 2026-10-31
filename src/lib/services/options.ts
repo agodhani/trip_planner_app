@@ -148,3 +148,27 @@ export async function listOptionComments(optionIds: string[]) {
     .where(inArray(comments.optionId, optionIds))
     .orderBy(desc(comments.createdAt));
 }
+
+export type OptionPanelItem = {
+  id: string; title: string; subtitle: string | null; status: string;
+  price: number | null; currency: string | null; bookingUrl: string | null;
+  bookingRef: string | null; source: string;
+  votes: { score: number; voters: { name: string; value: number }[] };
+  comments: { id: string; body: string; author: string }[];
+};
+
+/** Options of one kind with votes and comments, shaped for the UI panel. */
+export async function optionPanel(tripId: string, kind: string): Promise<OptionPanelItem[]> {
+  const rows = (await listOptions(tripId, kind)).map((r) => r.option);
+  const ids = rows.map((o) => o.id);
+  const [votes, commentRows] = await Promise.all([listVotes(ids), listOptionComments(ids)]);
+  return rows.map((o) => ({
+    id: o.id, title: o.title, subtitle: o.subtitle, status: o.status,
+    price: o.priceAmount ? Number(o.priceAmount) : null, currency: o.priceCurrency,
+    bookingUrl: o.bookingUrl, bookingRef: o.bookingRef, source: o.source,
+    votes: votes.get(o.id) ?? { score: 0, voters: [] },
+    comments: commentRows
+      .filter((c) => c.optionId === o.id)
+      .map((c) => ({ id: c.id, body: c.body, author: c.authorName })),
+  }));
+}

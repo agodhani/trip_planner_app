@@ -1,0 +1,1027 @@
+{
+  "search_metadata": {
+    "id": "6ae61be6b917c7d9fd6f0fe3",
+    "status": "Success",
+    "json_endpoint": "https://serpapi.com/searches/SuYOIkCrZb3m6Cnro-qdtlc2e4EY6HOxVBL7ztxr-6Y/6ae61be6b917c7d9fd6f0fe3.json",
+    "markdown_endpoint": "https://serpapi.com/searches/SuYOIkCrZb3m6Cnro-qdtlc2e4EY6HOxVBL7ztxr-6Y/6ae61be6b917c7d9fd6f0fe3.md",
+    "created_at": "2026-10-31 16:48:38 UTC",
+    "processed_at": "2026-10-31 16:48:38 UTC",
+    "google_maps_url": "https://www.google.com/maps/search/museums/@38.7077507,-9.1365919,13z/data=!3m1!4b1!4m2!2m1!6e5?hl=en",
+    "raw_html_file": "https://serpapi.com/searches/SuYOIkCrZb3m6Cnro-qdtlc2e4EY6HOxVBL7ztxr-6Y/6ae61be6b917c7d9fd6f0fe3.html",
+    "prettify_html_file": "https://serpapi.com/searches/SuYOIkCrZb3m6Cnro-qdtlc2e4EY6HOxVBL7ztxr-6Y/6ae61be6b917c7d9fd6f0fe3.prettify",
+    "total_time_taken": 0.81
+  },
+  "search_parameters": {
+    "engine": "google_maps",
+    "type": "search",
+    "q": "museums",
+    "ll": "@38.7077507,-9.1365919,13z",
+    "google_domain": "google.com",
+    "hl": "en"
+  },
+  "search_information": {
+    "local_results_state": "Results for exact spelling",
+    "query_displayed": "museums"
+  },
+  "local_results": [
+    {
+      "position": 1,
+      "title": "MAAT - Museum of Art, Architecture and Technology",
+      "place_id": "ChIJkfTl003LHg0RxFtZGUxQE8s",
+      "data_id": "0xd1ecb4dd3e5f491:0xcb13504c19595bc4",
+      "data_cid": "14633127902029896644",
+      "reviews_link": "https://serpapi.com/search.json?data_id=0xd1ecb4dd3e5f491%3A0xcb13504c19595bc4&engine=google_maps_reviews&hl=en",
+      "photos_link": "https://serpapi.com/search.json?data_id=0xd1ecb4dd3e5f491%3A0xcb13504c19595bc4&engine=google_maps_photos&hl=en",
+      "gps_coordinates": {
+        "latitude": 38.6958561,
+        "longitude": -9.193311999999999
+      },
+      "place_id_search": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&place_id=ChIJkfTl003LHg0RxFtZGUxQE8s",
+      "provider_id": "/g/11cs3vkn8z",
+      "rating": 4.3,
+      "reviews": 26133,
+      "type": "Museum",
+      "types": [
+        "Museum",
+        "Tourist attraction"
+      ],
+      "address": "Av. Brasília, 1300-598 Lisboa, Portugal",
+      "country": "Portugal",
+      "open_state": "Open · Closes 7 PM",
+      "hours": "Open · Closes 7 PM",
+      "operating_hours": {
+        "saturday": "10 AM–7 PM",
+        "sunday": "10 AM–7 PM (All Saints' Day might affect these hours)",
+        "monday": "10 AM–7 PM (All Souls Day might affect these hours)",
+        "tuesday": "Closed",
+        "wednesday": "10 AM–7 PM",
+        "thursday": "10 AM–7 PM",
+        "friday": "10 AM–7 PM"
+      },
+      "phone": "+351 21 002 8130",
+      "website": "https://www.maat.pt/pt",
+      "description": "Electricity museum in a power station. Museum in an old riverside power station, with renewable energy & electrical phenomena exhibits.",
+      "extensions": [
+        {
+          "accessibility": [
+            "Wheelchair accessible entrance",
+            "Wheelchair accessible parking lot",
+            "Wheelchair accessible restroom"
+          ]
+        }
+      ],
+      "thumbnail": "https://lh3.googleusercontent.com/grass-cs/AABkmLduFEMPe_7Ks54KeLMFgSS5h8ZOxFH_PU_ZDybyY0y39vp58vVTkVYXPFqTa8uwufs31TwfJS3s5qekd6oL_HPTOuEc3Vj8kolcXO5yNutXkpTljOj0rxdulRMzr72IDX57hAaU=w1000-h1000-c-n",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/b0gZm3icHcRdboIwAADgEyFlXYUt8YFFiT8wyKgEfCFYCg2tFGkr4gV3Bm9j4vfwPf-Z1oP6tm3B4KKVshXUKDoS2Wva6wWRF7sdK6Usomzf_-GXsDbBJkpo6R4U-jzQMAraNEXMO8X3YFsmx_K0ns9zAWb4dRuQd8swz4o8Ca648sxkGgUdPDX7FCp0pbxeyrDcJjg2GwKzzuNSkDxG86_ROR-w6OIOjPfaiL_oMbofu3WOXOZXx9XkAAAs9p5Y_Quau0WQ"
+    },
+    {
+      "position": 2,
+      "title": "Money Museum",
+      "place_id": "ChIJNcwThXk0GQ0RHsf-GSiRodA",
+      "data_id": "0xd1934798513cc35:0xd0a1912819fec71e",
+      "data_cid": "15033456632560273182",
+      "reviews_link": "https://serpapi.com/search.json?data_id=0xd1934798513cc35%3A0xd0a1912819fec71e&engine=google_maps_reviews&hl=en",
+      "photos_link": "https://serpapi.com/search.json?data_id=0xd1934798513cc35%3A0xd0a1912819fec71e&engine=google_maps_photos&hl=en",
+      "gps_coordinates": {
+        "latitude": 38.7086044,
+        "longitude": -9.138915599999999
+      },
+      "place_id_search": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&place_id=ChIJNcwThXk0GQ0RHsf-GSiRodA",
+      "provider_id": "/g/11b7f09rms",
+      "rating": 4.6,
+      "reviews": 4911,
+      "unclaimed_listing": true,
+      "type": "Museum",
+      "types": [
+        "Museum",
+        "Tourist attraction"
+      ],
+      "address": "Largo de São Julião, 1100-150 Lisboa, Portugal",
+      "country": "Portugal",
+      "open_state": "Closes soon · 5:30 PM · Opens 10 AM Sun",
+      "hours": "Closes soon · 5:30 PM · Opens 10 AM Sun",
+      "operating_hours": {
+        "saturday": "10 AM–5:30 PM",
+        "sunday": "10 AM–5:30 PM (All Saints' Day might affect these hours)",
+        "monday": "Closed (All Souls Day might affect these hours)",
+        "tuesday": "Closed",
+        "wednesday": "10 AM–5:30 PM",
+        "thursday": "10 AM–5:30 PM",
+        "friday": "10 AM–5:30 PM"
+      },
+      "phone": "+351 21 321 3240",
+      "website": "http://www.museudodinheiro.pt/",
+      "description": "Interactive displays in a former church. Hands-on exhibits, coin making & banknote printing in a museum housed in a baroque-era church.",
+      "extensions": [
+        {
+          "accessibility": [
+            "Wheelchair accessible entrance",
+            "Wheelchair accessible restroom"
+          ]
+        }
+      ],
+      "thumbnail": "https://lh3.googleusercontent.com/grass-cs/AABkmLd-djNAzrB27NM9wRv5o03mRVm512iQs3uGm1xjbRu1pQVkQAxD5_lVsyr3r8xr5SQztjySqHth1EprCNzrZYMx8YJ_5JdmZ2JnyOT5iNPAxhoKKJ7OyrMEwDWJMHTv1MPv7zFw=w1000-h1000-c-n",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/8sAAgXicHcRBjoIwFADQEyEU0qAmLqo4mmpR0DDRjZkBQkVK8bdA4YKewduY-Bbv_eJaN2pu2xX3JoWURZW3KodU1jqv9SSVwi7gTykrVTYhy4fYZ1ZWhmSEpeuHbNbHHZaOJ-JEYOTeI-W1G4FM-R-3qImSR0RMgG9VogbwYGoAn6JRl8PpudUcrRtYhSNcL8xML_SGaSauLq2HwxnfwyMxXO521D8MwNZ98EvZ9twhduz88adf9MhxHIt_T636A6VuRYM"
+    },
+    {
+      "position": 3,
+      "title": "Calouste Gulbenkian Museum",
+      "place_id": "ChIJNTZ10A0zGQ0ROwhyCh2mkwg",
+      "data_id": "0xd19330dd0753635:0x893a61d0a72083b",
+      "data_cid": "618020217539397691",
+      "reviews_link": "https://serpapi.com/search.json?data_id=0xd19330dd0753635%3A0x893a61d0a72083b&engine=google_maps_reviews&hl=en",
+      "photos_link": "https://serpapi.com/search.json?data_id=0xd19330dd0753635%3A0x893a61d0a72083b&engine=google_maps_photos&hl=en",
+      "gps_coordinates": {
+        "latitude": 38.737812399999996,
+        "longitude": -9.1535455
+      },
+      "place_id_search": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&place_id=ChIJNTZ10A0zGQ0ROwhyCh2mkwg",
+      "provider_id": "/m/03w92w",
+      "rating": 4.7,
+      "reviews": 18312,
+      "type": "Art museum",
+      "types": [
+        "Art museum",
+        "Museum",
+        "Tourist attraction"
+      ],
+      "address": "Av. de Berna 45A, 1067-001 Lisboa, Portugal",
+      "country": "Portugal",
+      "open_state": "Open · Closes 9 PM",
+      "hours": "Open · Closes 9 PM",
+      "operating_hours": {
+        "saturday": "10 AM–9 PM",
+        "sunday": "10 AM–9 PM (All Saints' Day might affect these hours)",
+        "monday": "10 AM–6 PM (All Souls Day might affect these hours)",
+        "tuesday": "Closed",
+        "wednesday": "10 AM–6 PM",
+        "thursday": "10 AM–6 PM",
+        "friday": "10 AM–6 PM"
+      },
+      "phone": "+351 21 782 3000",
+      "website": "https://gulbenkian.pt/museu/",
+      "description": "Oil magnate's global art collection. Displays of art from Greek to Roman & Asian to European, plus gardens, shop & restaurant.",
+      "extensions": [
+        {
+          "accessibility": [
+            "Wheelchair accessible entrance",
+            "Wheelchair accessible parking lot",
+            "Wheelchair accessible restroom"
+          ]
+        }
+      ],
+      "thumbnail": "https://lh3.googleusercontent.com/grass-cs/AABkmLe7KpgXLMBG9JvmSlhY2xL-R5vl2n7iUVf-F6eZrcW56YPlWlUPU3skzu5NFXXcbY74dXKOtlJKkC5Gv5O-umBOXpbiccRhMH4Sl_HjK4vADE1HekCYv-BPsUgmtkU4Z3sP2v1m=w1000-h1000-c-n",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/ernO53icHcTbDoIgAADQLyKv5GrrQbu5tHQ1CntpRQQFqBOk1g_2Df1NW-fhfD_cmFaPHUfyYMCahknaa9qRpja0NgPSKId1Z60B0U4cJ0LlNMpahvN1shytrNpJXvmvHGyhlX4d3dH-BhZDeuzIAQ6rUh4kKlGgxbuHmwXG5FJF4RVnhZGrTEzh0sIC9CopcHu5E7Ll6zTcyVP6yEIbz-ZeSsW0siApNWLKCBQeA1361lOTp-e6LuD_Cah_RPFEIA"
+    },
+    {
+      "position": 4,
+      "title": "Museum of the Orient",
+      "place_id": "ChIJEZ47qKM0GQ0RKDX2uFZS2BM",
+      "data_id": "0xd1934a3a83b9e11:0x13d85256b8f63528",
+      "data_cid": "1429983414113940776",
+      "reviews_link": "https://serpapi.com/search.json?data_id=0xd1934a3a83b9e11%3A0x13d85256b8f63528&engine=google_maps_reviews&hl=en",
+      "photos_link": "https://serpapi.com/search.json?data_id=0xd1934a3a83b9e11%3A0x13d85256b8f63528&engine=google_maps_photos&hl=en",
+      "gps_coordinates": {
+        "latitude": 38.7028828,
+        "longitude": -9.1705943
+      },
+      "place_id_search": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&place_id=ChIJEZ47qKM0GQ0RKDX2uFZS2BM",
+      "provider_id": "/m/080bnq3",
+      "rating": 4.5,
+      "reviews": 4568,
+      "type": "Art museum",
+      "types": [
+        "Art museum",
+        "Museum",
+        "Tourist attraction"
+      ],
+      "address": "Doca de Alcantara, Norte, Av. Brasília, 1350-352 Lisboa, Portugal",
+      "country": "Portugal",
+      "open_state": "Open · Closes 6 PM",
+      "hours": "Open · Closes 6 PM",
+      "operating_hours": {
+        "saturday": "10 AM–6 PM",
+        "sunday": "10 AM–6 PM (All Saints' Day might affect these hours)",
+        "monday": "Closed (All Souls Day might affect these hours)",
+        "tuesday": "10 AM–6 PM",
+        "wednesday": "10 AM–6 PM",
+        "thursday": "10 AM–6 PM",
+        "friday": "10 AM–8 PM"
+      },
+      "phone": "+351 21 358 5200",
+      "website": "https://www.foriente.pt/",
+      "description": "Museum of Asian art & artifacts. Significant Asian & Portuguese art & artifact collections in a modern museum with conference center.",
+      "extensions": [
+        {
+          "accessibility": [
+            "Wheelchair accessible entrance",
+            "Wheelchair accessible parking lot",
+            "Wheelchair accessible restroom"
+          ]
+        }
+      ],
+      "thumbnail": "https://lh3.googleusercontent.com/grass-cs/AABkmLcKn5EM9mgfjoOooumKAMbz-eES3ZY1jx4Nc80WUvJhYn_CoR6N9cd5u2apenB2LFd2HLJrTIkXLFKSFX5PI4de7k_kMARHw-511VC_FZYw5nHTYbzFP4GgSUA81C_MpMEKDfU_=w1000-h1000-c-n",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/OKdqvXicHcRdDoIgAADgE5Fi0t_WA5lkKdUyK3thhYTLBCearQt2hm7T1vfwfT9501RmYlmPvN-TWsuHaI2ouVaNUE2P69KS9cUYwI2F8awoIx4q5NNxKW93vdG6LUNMr28g_Lh_TuH95a75yD4mz1WeKubp3WA95hlqnUsl1MyJSOYE0areL4tTRMKYnNB26WZiWLCC4l3QAQThwWPknHZIBfv0-iZbdyHjBI-gx2hF_XB-S9i0g7Ztg_w_B-oHJPtC_Q"
+    },
+    {
+      "position": 5,
+      "title": "Quake - Lisbon Earthquake Museum",
+      "place_id": "ChIJ6QlNAc7LHg0RwdjZgh1jUyc",
+      "data_id": "0xd1ecbce014d09e9:0x2753631d82d9d8c1",
+      "data_cid": "2833717568946690241",
+      "reviews_link": "https://serpapi.com/search.json?data_id=0xd1ecbce014d09e9%3A0x2753631d82d9d8c1&engine=google_maps_reviews&hl=en",
+      "photos_link": "https://serpapi.com/search.json?data_id=0xd1ecbce014d09e9%3A0x2753631d82d9d8c1&engine=google_maps_photos&hl=en",
+      "gps_coordinates": {
+        "latitude": 38.697036,
+        "longitude": -9.1970676
+      },
+      "place_id_search": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&place_id=ChIJ6QlNAc7LHg0RwdjZgh1jUyc",
+      "provider_id": "/g/11rl2f1vxs",
+      "rating": 4.7,
+      "reviews": 10904,
+      "type": "Museum",
+      "types": [
+        "Museum",
+        "Tourist attraction"
+      ],
+      "address": "Rua do Cais da Alfândega Velha 39, 1300-598 Lisboa, Portugal",
+      "country": "Portugal",
+      "open_state": "Open · Closes 6 PM",
+      "hours": "Open · Closes 6 PM",
+      "operating_hours": {
+        "saturday": "10 AM–6 PM",
+        "sunday": "10 AM–6 PM (All Saints' Day might affect these hours)",
+        "monday": "10 AM–6 PM (All Souls Day might affect these hours)",
+        "tuesday": "10 AM–6 PM",
+        "wednesday": "10 AM–6 PM",
+        "thursday": "10 AM–6 PM",
+        "friday": "10 AM–6 PM"
+      },
+      "website": "https://lisbonquake.com/",
+      "extensions": [
+        {
+          "accessibility": [
+            "Wheelchair accessible entrance",
+            "Wheelchair accessible parking lot",
+            "Wheelchair accessible restroom"
+          ]
+        }
+      ],
+      "thumbnail": "https://lh3.googleusercontent.com/grass-cs/AABkmLeJdvVxX49_MdFfpzMAcsZXfpVMpE0rlXZK4qqMR4_zqfquw-bMQ2PaT4cIZP77btvZualBp_rAuRgsATA1mrJqyDmVT7g8y1FtPjfrKybdGBE0kk8Wrj8Oa5glCVMUIZvPeK9V=w1000-h1000-c-n",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/0aBHqnicHcTbboIwAADQL0LKhgFN9lC8RbGRGVZJXwiUUiIFegPFH9w37G9Mdh7O329jrTRr1xXN54IPAxdsNEzTobestws6dC7XhTEONS6EUdud2ama8DPzVzmq9rV8IUgNyWqJkdwBLTIS-0qhq5-_VK3Gh1Oi74-kSH16JEkQlHYiYyEimWs4XrmBKfQ6fVLztsNpwMPZ29vkXut4LqtDtANtG970PbwUSy42GP0cyZSweIW_Hh4AwGn-p07_BhuORjE"
+    },
+    {
+      "position": 6,
+      "title": "Museum of Lisbon – Pimenta Palace",
+      "place_id": "ChIJXZfOrvwyGQ0RsitHFwmsKBk",
+      "data_id": "0xd1932fcaece975d:0x1928ac0917472bb2",
+      "data_cid": "1812888005061847986",
+      "reviews_link": "https://serpapi.com/search.json?data_id=0xd1932fcaece975d%3A0x1928ac0917472bb2&engine=google_maps_reviews&hl=en",
+      "photos_link": "https://serpapi.com/search.json?data_id=0xd1932fcaece975d%3A0x1928ac0917472bb2&engine=google_maps_photos&hl=en",
+      "gps_coordinates": {
+        "latitude": 38.758551,
+        "longitude": -9.156418
+      },
+      "place_id_search": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&place_id=ChIJXZfOrvwyGQ0RsitHFwmsKBk",
+      "provider_id": "/m/0j9nsjm",
+      "rating": 4.6,
+      "reviews": 2141,
+      "type": "Museum",
+      "types": [
+        "Museum",
+        "Local history museum",
+        "Tourist attraction"
+      ],
+      "address": "Campo Grande 245, 1700-091 Lisboa, Portugal",
+      "country": "Portugal",
+      "open_state": "Open · Closes 6 PM",
+      "hours": "Open · Closes 6 PM",
+      "operating_hours": {
+        "saturday": "10 AM–6 PM",
+        "sunday": "10 AM–6 PM (All Saints' Day might affect these hours)",
+        "monday": "Closed (All Souls Day might affect these hours)",
+        "tuesday": "10 AM–6 PM",
+        "wednesday": "10 AM–6 PM",
+        "thursday": "10 AM–6 PM",
+        "friday": "10 AM–6 PM"
+      },
+      "phone": "+351 21 751 3200",
+      "website": "http://www.museudelisboa.pt/",
+      "description": "Museum on history of Lisbon & its people. Museum on history of Lisbon, with chronological exhibits from prehistory to the early 20th century.",
+      "extensions": [
+        {
+          "accessibility": [
+            "Wheelchair accessible entrance",
+            "Wheelchair accessible parking lot",
+            "Wheelchair accessible restroom"
+          ]
+        }
+      ],
+      "thumbnail": "https://lh3.googleusercontent.com/grass-cs/AABkmLfU5WKaWvTTtBs3CjUGH6z7nT4SxOtDmSdwDrS4IWkezFdxbMyoKgW1PWYBkyFOiWCkfu2u929wCBvlPGSVv21M4LZE4hvOgup0wlf1Nik1Ks3eqTpfz8hUIbbPcgjgTN5x9jRi=w1000-h1000-c-n",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/Qrb3LHicHcRJboMwAADAFxEwkIVKPbBkE0lAxdRqbsEYGwyYYrOED-YN-U2lzmHeL6ZUJz90vWbWigpBazJI0mPRKtKqFRaNTvuHlBqWuut6vLkU6RqFDzRCqDxp-VV6PG2WbQvtZI5U0CT5FPSJfUacLId8zq5PEVIEYvTj8echKpHPi8EcHNOZfG-s42PyPZrgal_ue5uNER06Y6oLcCs5CKVFfmFXLDuWnrMsxrSi8Laeneqr_JyAYRga-x9r7R_BwkW-"
+    },
+    {
+      "position": 7,
+      "title": "Pavilhão do Conhecimento - Ciência Viva",
+      "place_id": "ChIJrdyrGYkxGQ0RyGeLfnIBiRY",
+      "data_id": "0xd19318919abdcad:0x168901727e8b67c8",
+      "data_cid": "1623830731904739272",
+      "reviews_link": "https://serpapi.com/search.json?data_id=0xd19318919abdcad%3A0x168901727e8b67c8&engine=google_maps_reviews&hl=en",
+      "photos_link": "https://serpapi.com/search.json?data_id=0xd19318919abdcad%3A0x168901727e8b67c8&engine=google_maps_photos&hl=en",
+      "gps_coordinates": {
+        "latitude": 38.7622587,
+        "longitude": -9.095872
+      },
+      "place_id_search": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&place_id=ChIJrdyrGYkxGQ0RyGeLfnIBiRY",
+      "provider_id": "/g/121fqp35",
+      "rating": 4.7,
+      "reviews": 8739,
+      "type": "Science museum",
+      "types": [
+        "Science museum",
+        "Museum",
+        "Tourist attraction"
+      ],
+      "address": "Largo José Mariano Gago nº1, 1990-073 Lisboa, Portugal",
+      "country": "Portugal",
+      "open_state": "Open · Closes 7 PM",
+      "hours": "Open · Closes 7 PM",
+      "operating_hours": {
+        "saturday": "10 AM–7 PM",
+        "sunday": "10 AM–7 PM (All Saints' Day might affect these hours)",
+        "monday": "Closed (All Souls Day might affect these hours)",
+        "tuesday": "10 AM–6 PM",
+        "wednesday": "10 AM–6 PM",
+        "thursday": "10 AM–6 PM",
+        "friday": "10 AM–6 PM"
+      },
+      "phone": "+351 21 891 7100",
+      "website": "http://www.pavconhecimento.pt/home/",
+      "description": "Science museum with interactive exhibits. Contemporary science museum with interactive exhibits, experiments, workshops & kids' play areas.",
+      "extensions": [
+        {
+          "accessibility": [
+            "Wheelchair accessible entrance",
+            "Wheelchair accessible parking lot",
+            "Wheelchair accessible restroom"
+          ]
+        }
+      ],
+      "thumbnail": "https://lh3.googleusercontent.com/grass-cs/AABkmLfo7Fm4lWATIGzAnlalOCgLmMYlv0Vjo63gNOA8nk8LfbH-TsyVC64AvwDBXSLxA-mXHMLyFOYrmf_-tXDfr1oNtmx2IJ886WLg5bjsLNvPYOnvSyZik0sYidY8BoYysYzIleI=w1000-h1000-c-n",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/5A5-iXicHcRLDoIwFADAExXqDxsTFwWDYgqYaJS6MYpQlH4Mr4J4QO_gbUycxXw_lbUPmLmurEaOMEbI4glFkxttC22d3ChXNGcAlINLqV8rVpppqMbyQHfR8k21PMs0EEzFXLZ4fzfeSCQpJbomrLys0A76feCNadst_GzLXhSpbBWzPkx5o8oTstmibAYmseo1jNaEeAcmJpc7sKTd8FS32_54qzHw25UT3_Ae-DuSRTTvBhhjVP3Pkf4BRYhFLw"
+    },
+    {
+      "position": 8,
+      "title": "National Museum of Science & Natural History",
+      "place_id": "ChIJR7za-HszGQ0RdlhF-orml1Q",
+      "data_id": "0xd19337bf8dabc47:0x5497e68afa455876",
+      "data_cid": "6095594105247979638",
+      "reviews_link": "https://serpapi.com/search.json?data_id=0xd19337bf8dabc47%3A0x5497e68afa455876&engine=google_maps_reviews&hl=en",
+      "photos_link": "https://serpapi.com/search.json?data_id=0xd19337bf8dabc47%3A0x5497e68afa455876&engine=google_maps_photos&hl=en",
+      "gps_coordinates": {
+        "latitude": 38.7176798,
+        "longitude": -9.1507872
+      },
+      "place_id_search": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&place_id=ChIJR7za-HszGQ0RdlhF-orml1Q",
+      "provider_id": "/m/0x2hsy8",
+      "rating": 4.4,
+      "reviews": 3544,
+      "type": "Natural history museum",
+      "types": [
+        "Natural history museum",
+        "Museum",
+        "Science museum",
+        "Tourist attraction"
+      ],
+      "address": "R. da Escola Politécnica 56, 1250-102 Lisboa, Portugal",
+      "country": "Portugal",
+      "open_state": "Closes soon · 5 PM · Opens 10 AM Sun",
+      "hours": "Closes soon · 5 PM · Opens 10 AM Sun",
+      "operating_hours": {
+        "saturday": "10 AM–5 PM",
+        "sunday": "10 AM–5 PM (All Saints' Day might affect these hours)",
+        "monday": "Closed (All Souls Day might affect these hours)",
+        "tuesday": "10 AM–5 PM",
+        "wednesday": "10 AM–5 PM",
+        "thursday": "10 AM–5 PM",
+        "friday": "10 AM–5 PM"
+      },
+      "phone": "+351 21 392 1808",
+      "website": "https://www.museus.ulisboa.pt/",
+      "description": "Elegant natural history & science museum. Landmark museum with preserved animal specimens, like fish & birds, plus anthropological artifacts.",
+      "extensions": [
+        {
+          "accessibility": [
+            "Wheelchair accessible entrance",
+            "Wheelchair accessible restroom"
+          ]
+        }
+      ],
+      "thumbnail": "https://lh3.googleusercontent.com/grass-cs/AABkmLcqwHpJNEsOlGgfx8K3TpeGlkgZZ_tERfm_iCQ2nobL1Ep83UXxDbxtUwQBHP4WFpvnhjjOcd_vUW-oVdQNfTiJ9I-s0O-MQSggkWKu1RUwIetF0ZqLlNqCF4bwIxMBbgXCikU=w1000-h1000-c-n",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/2aJfOXicHcTRFoEwAADQL5qWPOAcD0oRKWFyeulo1kprWzbWF_oHf-Mc9-F-P7XWUs0ti9XOiApBGXkp8sSCa8L1CIvOos-bUgAra7l02y7CvdnIbeyrhK1pNUx3zlmSNWtpnhfaP1Zd0XjpmIsysn05ddB1WJWDRiZ1N4dJFsg3rx-PBN-LN8qAuNzTuDo321kIFEzAPj1R2ma7l31EJiQ6gHkfsbj3gklpwmHvlvTqNS1aGBtCCOr_GPAfv7NFrw"
+    },
+    {
+      "position": 9,
+      "title": "Fado Museum",
+      "place_id": "ChIJeZYlNnQ0GQ0RU4WDGSc3yDg",
+      "data_id": "0xd19347436259679:0x38c8372719838553",
+      "data_cid": "4091580902537397587",
+      "reviews_link": "https://serpapi.com/search.json?data_id=0xd19347436259679%3A0x38c8372719838553&engine=google_maps_reviews&hl=en",
+      "photos_link": "https://serpapi.com/search.json?data_id=0xd19347436259679%3A0x38c8372719838553&engine=google_maps_photos&hl=en",
+      "gps_coordinates": {
+        "latitude": 38.7111258,
+        "longitude": -9.127616
+      },
+      "place_id_search": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&place_id=ChIJeZYlNnQ0GQ0RU4WDGSc3yDg",
+      "provider_id": "/g/122_4c0q",
+      "rating": 4.4,
+      "reviews": 6135,
+      "type": "Museum",
+      "types": [
+        "Museum",
+        "Tourist attraction"
+      ],
+      "address": "Alfama, Largo do Chafariz de Dentro 1, 1100-139 Lisboa, Portugal",
+      "country": "Portugal",
+      "open_state": "Open · Closes 6 PM",
+      "hours": "Open · Closes 6 PM",
+      "operating_hours": {
+        "saturday": "10 AM–6 PM",
+        "sunday": "10 AM–6 PM (All Saints' Day might affect these hours)",
+        "monday": "Closed (All Souls Day might affect these hours)",
+        "tuesday": "10 AM–6 PM",
+        "wednesday": "10 AM–6 PM",
+        "thursday": "10 AM–6 PM",
+        "friday": "10 AM–6 PM"
+      },
+      "phone": "+351 21 882 3470",
+      "website": "http://www.museudofado.pt/",
+      "description": "Displays on the Portuguese musical genre. Exhibition on traditional fado, with audiovisual displays & archives, plus a cafe with concerts.",
+      "extensions": [
+        {
+          "accessibility": [
+            "Wheelchair accessible entrance",
+            "Wheelchair accessible parking lot",
+            "Wheelchair accessible restroom"
+          ]
+        }
+      ],
+      "thumbnail": "https://lh3.googleusercontent.com/grass-cs/AABkmLdp9SSDp1h92jCLof0G5I7Pj3ZuMTcHPC1l6MXVJ0VF8dOPnlUCHLiWr3C62qsWlnKT-relHvBWA5As_8SJGtGsmGNvHLjPE2DFds5ud8Ll2E0KZGD9zus-yPElJjQV5TkFYryK=w1000-h1000-c-n",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/wsYZ_HicHcTdboIwGADQJ6oUCA5MdoH8FKFuXWCg3ixLYSCWlvUrLvqCPsPeZsnOxfl9DMbMsLEsMbirXqledAt0mitpOmlWXE1Wrz8BEAcrDLeXibZzUJbxbA-BM0ZUfWHi7Z7Y6J6WfcUzFtlivT_UOa5Tv31lUrxHGT032o3Wzjc0QhYV0p3Irtsm9EL48MucGAITeblmdGSJE6cteEvrU-EkuDiROLgvgG4sEfn4VnvVJT3qW_H8Y2OM0fA_R_IPvQtDAA"
+    },
+    {
+      "position": 10,
+      "title": "Museum of Contemporary Art – MAC/CCB",
+      "place_id": "ChIJW51RQkPLHg0RudqetTf2TKQ",
+      "data_id": "0xd1ecb4342519d5b:0xa44cf637b59edab9",
+      "data_cid": "11839108239580912313",
+      "reviews_link": "https://serpapi.com/search.json?data_id=0xd1ecb4342519d5b%3A0xa44cf637b59edab9&engine=google_maps_reviews&hl=en",
+      "photos_link": "https://serpapi.com/search.json?data_id=0xd1ecb4342519d5b%3A0xa44cf637b59edab9&engine=google_maps_photos&hl=en",
+      "gps_coordinates": {
+        "latitude": 38.6958741,
+        "longitude": -9.2090914
+      },
+      "place_id_search": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&place_id=ChIJW51RQkPLHg0RudqetTf2TKQ",
+      "provider_id": "/m/0drx_1h",
+      "rating": 4.5,
+      "reviews": 8123,
+      "type": "Modern art museum",
+      "types": [
+        "Modern art museum",
+        "Art museum",
+        "Museum",
+        "Tourist attraction"
+      ],
+      "address": "Praça do Império, 1449-003 Lisboa, Portugal",
+      "country": "Portugal",
+      "open_state": "Open · Closes 6:30 PM",
+      "hours": "Open · Closes 6:30 PM",
+      "operating_hours": {
+        "saturday": "10 AM–6:30 PM",
+        "sunday": "10 AM–6:30 PM (All Saints' Day might affect these hours)",
+        "monday": "Closed (All Souls Day might affect these hours)",
+        "tuesday": "10 AM–6:30 PM",
+        "wednesday": "10 AM–6:30 PM",
+        "thursday": "10 AM–6:30 PM",
+        "friday": "10 AM–6:30 PM"
+      },
+      "phone": "+351 21 361 2400",
+      "website": "http://www.ccb.pt/macccb",
+      "description": "Museum of modern & contemporary art. Modern & contemporary art museum, with works by Picasso, Bacon & Warhol plus temporary exhibitions.",
+      "extensions": [
+        {
+          "accessibility": [
+            "Wheelchair accessible entrance",
+            "Wheelchair accessible parking lot",
+            "Wheelchair accessible restroom"
+          ]
+        }
+      ],
+      "thumbnail": "https://lh3.googleusercontent.com/grass-cs/AABkmLfb42OrRMs1ydVdyp3C24UJIIlygaTgfFKhqleNZQoofh6ZR-kEvxRP01NHFwBADfEOIw4207AG3z5oL52G2Rf4g7B03jsLf9JVPwW3dusPH8GXyiA1NF8ErAlAYhfQjuK6JAkylg=w1000-h1000-c-n",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/oa1IOnicHcTdFoEwAADgJ0pri3COi0W_knT831Fto2m0knlDj-BtnOO7-L4f1jR3OdZ1zlCPCkF50cqizkTVFFXTy8RNp_VJSi2TOsZ2eYvI2YTLOl1IQ-XbXN3RFJqbMAi4oqc1Je6cPXgRH1dCEDY4plrpPF9pAozYdzsbz4izDDoTAgt76N0XUR96MCUmtWyArjIio3CbdDuUtzLxh95eXbARu0OnxhwfGFld2_kgxKXidNIZAACN_c-06geetkPr"
+    },
+    {
+      "position": 11,
+      "title": "Carmo Archaeological Museum",
+      "place_id": "ChIJP8YuN380GQ0R7yzgkmX11zI",
+      "data_id": "0xd19347f372ec63f:0x32d7f56592e02cef",
+      "data_cid": "3663666638493854959",
+      "reviews_link": "https://serpapi.com/search.json?data_id=0xd19347f372ec63f%3A0x32d7f56592e02cef&engine=google_maps_reviews&hl=en",
+      "photos_link": "https://serpapi.com/search.json?data_id=0xd19347f372ec63f%3A0x32d7f56592e02cef&engine=google_maps_photos&hl=en",
+      "gps_coordinates": {
+        "latitude": 38.712038299999996,
+        "longitude": -9.140612899999999
+      },
+      "place_id_search": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&place_id=ChIJP8YuN380GQ0R7yzgkmX11zI",
+      "provider_id": "/m/0gq4n5",
+      "rating": 4.5,
+      "reviews": 21792,
+      "type": "Archaeological museum",
+      "types": [
+        "Archaeological museum",
+        "Historical landmark",
+        "History museum",
+        "Museum",
+        "Open air museum",
+        "Tourist attraction"
+      ],
+      "address": "Largo do Carmo, 1200-092 Lisboa, Portugal",
+      "country": "Portugal",
+      "open_state": "Open · Closes 7 PM",
+      "hours": "Open · Closes 7 PM",
+      "operating_hours": {
+        "saturday": "10 AM–7 PM",
+        "sunday": "Closed (All Saints' Day might affect these hours)",
+        "monday": "10 AM–7 PM (All Souls Day might affect these hours)",
+        "tuesday": "10 AM–7 PM",
+        "wednesday": "10 AM–7 PM",
+        "thursday": "10 AM–7 PM",
+        "friday": "10 AM–7 PM"
+      },
+      "phone": "+351 21 346 0473",
+      "website": "https://museuarqueologicodocarmo.pt/",
+      "description": "Medieval ruins & archaeology museum. Ruined Gothic church destroyed by an earthquake in 1755, with an evocative roofless nave & museum.",
+      "extensions": [
+        {
+          "accessibility": [
+            "Wheelchair accessible entrance",
+            "Wheelchair accessible restroom",
+            "Wheelchair accessible seating"
+          ]
+        }
+      ],
+      "unsupported_extensions": [
+        {
+          "accessibility": [
+            "Wheelchair accessible parking lot"
+          ]
+        }
+      ],
+      "thumbnail": "https://lh3.googleusercontent.com/grass-cs/AABkmLepfGHCD0gHjcVlG54-KDh2IeX00IMdCa7qkGGqx9RLk_nb_eC1CZT85-oZ03h78oSsdOwgb1gb3OA4QYPys1L1QKSr2QLXyHw_zQtX0KzmVUfP0XtifkN8-LXI5v8i2PCtMF8w5g=w1000-h1000-c-n",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/V5HCfnicHcTdboIwGADQJ6p8BYnVZBesZkCoCnMznTdEammVnyqtY_qGPsLeZsnOxfl9aucuduF5rQ4myhjVypuVgzC9k72bCNN5ajhYi4T1oui16Zi81HFCl6CSs9i1cThF2VL7qeQA6epID7NrE8fXn_k7a8q-KiXFdP9BQmT2EOgZMVt73IyqwqoKNtG0-MrvFjNcZNvBLxi_J2P5KByH7NHtPuscuDvVzZogxtPwm5z8nLrVGxlD9TJiAED6f4H6P1HxQ48"
+    },
+    {
+      "position": 12,
+      "title": "National Coach Museum",
+      "place_id": "ChIJT2UiYkXLHg0RvagnSnJttwE",
+      "data_id": "0xd1ecb456222654f:0x1b76d724a27a8bd",
+      "data_cid": "123687852413790397",
+      "reviews_link": "https://serpapi.com/search.json?data_id=0xd1ecb456222654f%3A0x1b76d724a27a8bd&engine=google_maps_reviews&hl=en",
+      "photos_link": "https://serpapi.com/search.json?data_id=0xd1ecb456222654f%3A0x1b76d724a27a8bd&engine=google_maps_photos&hl=en",
+      "gps_coordinates": {
+        "latitude": 38.6965545,
+        "longitude": -9.197485
+      },
+      "place_id_search": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&place_id=ChIJT2UiYkXLHg0RvagnSnJttwE",
+      "provider_id": "/m/02w7hk5",
+      "rating": 4.6,
+      "reviews": 10888,
+      "type": "Museum",
+      "types": [
+        "Museum",
+        "Tourist attraction"
+      ],
+      "address": "Av. da Índia 136, 1300-300 Lisboa, Portugal",
+      "country": "Portugal",
+      "open_state": "Open · Closes 6 PM",
+      "hours": "Open · Closes 6 PM",
+      "operating_hours": {
+        "saturday": "10 AM–6 PM",
+        "sunday": "10 AM–6 PM (All Saints' Day might affect these hours)",
+        "monday": "Closed (All Souls Day might affect these hours)",
+        "tuesday": "10 AM–6 PM",
+        "wednesday": "10 AM–6 PM",
+        "thursday": "10 AM–6 PM",
+        "friday": "10 AM–6 PM"
+      },
+      "phone": "+351 21 049 2400",
+      "website": "http://museudoscoches.gov.pt/pt/",
+      "description": "Museum for 16th-19th century carriages. Ornate, 16th–19th century royal carriages displayed in an opulent, 18th-century palace riding arena.",
+      "extensions": [
+        {
+          "accessibility": [
+            "Wheelchair accessible entrance",
+            "Wheelchair accessible parking lot",
+            "Wheelchair accessible restroom"
+          ]
+        }
+      ],
+      "thumbnail": "https://lh3.googleusercontent.com/grass-cs/AABkmLc8S4FGIwT2goJfBkU-AwKBWj1lr3SiRgD3T5Uj9TO47lp-NoejIcSpIrxDyAjW-3VpQLP9Xm3JepDHbaQqve1XRuceHwINpCyKla2xOlycNX7xGiAlEA7Kcv0YSGEiX36pCVs=w1000-h1000-c-n",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/w9FgXnicHcRLDoIwFADAE1U-RVETF0UUEYMfUHGJL7WAhVYKAhf0Dt7GxFnM95M1jVRzTeMZHjEhGKetojWIqqFVMwJRaqxOlUKgNEKcZ7mDaWStPb-LTSa2D-d5RqQLnGth8BpH-Ym5OB6fi1m8t2wuUSho4UMk_bp3B1JcEb7I4-4wS0q8pdLd3NPj602N5NQC3XR-KJdDwFOz3_MBwsTuvZzwFbEDeOu3yFvlCZ7I5UUtOkPXdZT9B1T9AOrwQ-k"
+    },
+    {
+      "position": 13,
+      "title": "Museu de Marinha",
+      "place_id": "ChIJublmJ0PLHg0RM4CZ-KMulGA",
+      "data_id": "0xd1ecb432766b9b9:0x60942ea3f8998033",
+      "data_cid": "6959238605979615283",
+      "reviews_link": "https://serpapi.com/search.json?data_id=0xd1ecb432766b9b9%3A0x60942ea3f8998033&engine=google_maps_reviews&hl=en",
+      "photos_link": "https://serpapi.com/search.json?data_id=0xd1ecb432766b9b9%3A0x60942ea3f8998033&engine=google_maps_photos&hl=en",
+      "gps_coordinates": {
+        "latitude": 38.6969438,
+        "longitude": -9.2091554
+      },
+      "place_id_search": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&place_id=ChIJublmJ0PLHg0RM4CZ-KMulGA",
+      "provider_id": "/m/02w78ms",
+      "rating": 4.5,
+      "reviews": 14064,
+      "type": "Museum",
+      "types": [
+        "Museum",
+        "Tourist attraction"
+      ],
+      "address": "Praça do Império, Santa Maria de Belém, 1400-206 Lisboa, Portugal",
+      "country": "Portugal",
+      "open_state": "Closes soon · 5 PM · Opens 10 AM Sun",
+      "hours": "Closes soon · 5 PM · Opens 10 AM Sun",
+      "operating_hours": {
+        "saturday": "10 AM–5 PM",
+        "sunday": "10 AM–5 PM (All Saints' Day might affect these hours)",
+        "monday": "10 AM–5 PM (All Souls Day might affect these hours)",
+        "tuesday": "10 AM–5 PM",
+        "wednesday": "10 AM–5 PM",
+        "thursday": "10 AM–5 PM",
+        "friday": "10 AM–5 PM"
+      },
+      "phone": "+351 21 097 7388",
+      "website": "https://ccm.marinha.pt/pt/museu",
+      "description": "Maritime museum in 1500s monastery. Seagoing history with collections of model ships, maritime artifacts & ornate 18th-century barges.",
+      "extensions": [
+        {
+          "accessibility": [
+            "Wheelchair accessible entrance",
+            "Wheelchair accessible parking lot",
+            "Wheelchair accessible restroom",
+            "Wheelchair accessible seating"
+          ]
+        }
+      ],
+      "thumbnail": "https://lh3.googleusercontent.com/grass-cs/AABkmLeRakNMMVyfjF7QKMs3rz8z6UT2yv9X3mVXVuTeEHFtE9Y_ao7lmK7RsUtK2wXRmKsP2YU6y-_-8kDp6ZszKwfpg1SKOOWVdHfh-MJFwOWVhXi1QP4CWNScjDFzPbCBpB3U7gdS=w1000-h1000-c-n",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/C6raWHicHcbdEoFAGADQJ1r9mcKMC6ExVqSUuDFZ2y61bdO3NPWCnsHbMG7OnM-bK1XDRNNKbg2YlKykT6ANkZWilRoQKTTWZACIgDabuYXY0DArtr6fdPnDc_bYB6vpR70dH8zuNU4tkaTJ80CXK08tx6dLJp1SYCeEWGGzTUOBITBPsd2hCxoVi9o-Q4_bvGZGhHe7Y3Jb5Rz5a6_9nad3Yx8M58dtRB4Lrw-uc7d2rdhht2jaGrquI_6XoOoLh19Ebg"
+    },
+    {
+      "position": 14,
+      "title": "Museum of Illusions Lisbon",
+      "place_id": "ChIJj8nMpsE1GQ0RFrpq00JHTmc",
+      "data_id": "0xd1935c1a6ccc98f:0x674e4742d36aba16",
+      "data_cid": "7443965586430409238",
+      "reviews_link": "https://serpapi.com/search.json?data_id=0xd1935c1a6ccc98f%3A0x674e4742d36aba16&engine=google_maps_reviews&hl=en",
+      "photos_link": "https://serpapi.com/search.json?data_id=0xd1935c1a6ccc98f%3A0x674e4742d36aba16&engine=google_maps_photos&hl=en",
+      "gps_coordinates": {
+        "latitude": 38.710515,
+        "longitude": -9.140484599999999
+      },
+      "place_id_search": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&place_id=ChIJj8nMpsE1GQ0RFrpq00JHTmc",
+      "provider_id": "/g/11x2y44jy6",
+      "rating": 4.5,
+      "reviews": 1544,
+      "type": "Museum",
+      "types": [
+        "Museum",
+        "Tourist attraction"
+      ],
+      "address": "R. Ivens 62, 1200-227 Lisboa, Portugal",
+      "country": "Portugal",
+      "open_state": "Open · Closes 7:55 PM",
+      "hours": "Open · Closes 7:55 PM",
+      "operating_hours": {
+        "saturday": "10 AM–7:55 PM",
+        "sunday": "10 AM–7:55 PM (All Saints' Day might affect these hours)",
+        "monday": "12:40–7:55 PM (All Souls Day might affect these hours)",
+        "tuesday": "10 AM–7:55 PM",
+        "wednesday": "10 AM–7:55 PM",
+        "thursday": "10:40 AM–7:55 PM",
+        "friday": "10 AM–7:55 PM"
+      },
+      "phone": "+351 925 623 728",
+      "website": "https://moilisboa.com/?utm_source=google&utm_medium=localcards&utm_campaign=552623_lis",
+      "extensions": [
+        {
+          "accessibility": [
+            "Wheelchair accessible entrance",
+            "Wheelchair accessible restroom"
+          ]
+        }
+      ],
+      "thumbnail": "https://lh3.googleusercontent.com/grass-cs/AABkmLcYqHsupnHlePwtVWGOvEZMEFKx7oPzH80KQJVTJu2ydhicJ6iggotnG85I_9MhE_5Lyhck8wga1ttUFlYrLwCcLBpvqo-wlgNN0UEdyUllRj3T55DLk5Hzbfxz-6UNXSTCIxV1BNhYaC5h=w1000-h1000-c-n",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/8srtP3icHcTBboIwAADQL6oUTZUt8SAMRayoG7DhxWDFVqkt0mKBn_Ts35jsHd7rybSu1KdlcTYaUCkpLxpV1EQKXQg9IPJm0TpXChBlzWZuecMkuweqqUTAi63R6e9i8_D3a3--aidy2wcOXO3CNA6bYXdiFxKOL5RKLRYOWh4-1sw_INwxUjqG5rbWyZxnNTYewW71uEtgOI0imPinLuH8-zqKEfrCJQr647ntwTiJ_n5ib9mmthuxLPcQmxobQgjY_wSIN1otSIc"
+    },
+    {
+      "position": 15,
+      "title": "Aljube Museum - Resistance & Freedom",
+      "place_id": "ChIJ3STjmxs1GQ0RWulebnLz9YE",
+      "data_id": "0xd19351b9be324dd:0x81f5f3726e5ee95a",
+      "data_cid": "9364658672990349658",
+      "reviews_link": "https://serpapi.com/search.json?data_id=0xd19351b9be324dd%3A0x81f5f3726e5ee95a&engine=google_maps_reviews&hl=en",
+      "photos_link": "https://serpapi.com/search.json?data_id=0xd19351b9be324dd%3A0x81f5f3726e5ee95a&engine=google_maps_photos&hl=en",
+      "gps_coordinates": {
+        "latitude": 38.710211799999996,
+        "longitude": -9.1325235
+      },
+      "place_id_search": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&place_id=ChIJ3STjmxs1GQ0RWulebnLz9YE",
+      "provider_id": "/g/1234zvxv",
+      "rating": 4.7,
+      "reviews": 1754,
+      "unclaimed_listing": true,
+      "type": "History museum",
+      "types": [
+        "History museum",
+        "Heritage museum",
+        "Museum"
+      ],
+      "address": "R. Augusto Rosa 42, 1100-059 Lisboa, Portugal",
+      "country": "Portugal",
+      "open_state": "Open · Closes 6 PM",
+      "hours": "Open · Closes 6 PM",
+      "operating_hours": {
+        "saturday": "10 AM–6 PM",
+        "sunday": "10 AM–6 PM (All Saints' Day might affect these hours)",
+        "monday": "Closed (All Souls Day might affect these hours)",
+        "tuesday": "10 AM–6 PM",
+        "wednesday": "10 AM–6 PM",
+        "thursday": "10 AM–6 PM",
+        "friday": "10 AM–6 PM"
+      },
+      "phone": "+351 21 581 8535",
+      "website": "https://www.museudoaljube.pt/",
+      "extensions": [
+        {
+          "accessibility": [
+            "Wheelchair accessible entrance",
+            "Wheelchair accessible restroom"
+          ]
+        }
+      ],
+      "thumbnail": "https://lh3.googleusercontent.com/grass-cs/AABkmLd_iU1Tybj_9zUiSKk4uiF1CS0mNs9KeuO6j_Ye0dsc6hkMaI7YXKDlNryyPnZmL5Wx2TJOsxiVBIY-ilLS5rsATuNFOwKxyzMvAgeWLyXo0hE_b2Fr2CM2l7tZ2RPrVDaCdk7m2Q=w1000-h1000-c-n",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/Kwj3JnicHcTbboIwGADgJ0JKpxKXeIE4EsdJBx7whmBpaKWlS_8yqW-4R9jbLPG7-P5-mTHf8O66gr3NOqU6QUegmqjB0MHMiJJupxsAh4AbBJteJm3Nj15pb_d69TzyIu7nI4-8sEAyg1VMx3x5ryuKWiBL1qfNzq8u8VZk2tr9cJXJ4jzh8jOHiZ82u8rhIikWGoJyzKL8EU_2mf4EHT0n9qIQ-6hvONI4TLHwzRV_7fVp24Rt70t8WD88hJDDXhNn-AdlMUYh"
+    },
+    {
+      "position": 16,
+      "title": "Medeiros e Almeida",
+      "place_id": "ChIJidRNx3kzGQ0Rr6VxE4EqhMY",
+      "data_id": "0xd193379c74dd489:0xc6842a811371a5af",
+      "data_cid": "14304605050300900783",
+      "reviews_link": "https://serpapi.com/search.json?data_id=0xd193379c74dd489%3A0xc6842a811371a5af&engine=google_maps_reviews&hl=en",
+      "photos_link": "https://serpapi.com/search.json?data_id=0xd193379c74dd489%3A0xc6842a811371a5af&engine=google_maps_photos&hl=en",
+      "gps_coordinates": {
+        "latitude": 38.7215679,
+        "longitude": -9.1490289
+      },
+      "place_id_search": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&place_id=ChIJidRNx3kzGQ0Rr6VxE4EqhMY",
+      "provider_id": "/g/122sgsbz",
+      "rating": 4.7,
+      "reviews": 1016,
+      "type": "Museum",
+      "types": [
+        "Museum"
+      ],
+      "address": "R. Mouzinho da Silveira 4, 1250-194 Lisboa, Portugal",
+      "country": "Portugal",
+      "open_state": "Closes soon · 5 PM · Opens 10 AM Mon",
+      "hours": "Closes soon · 5 PM · Opens 10 AM Mon",
+      "operating_hours": {
+        "saturday": "10 AM–5 PM",
+        "sunday": "Closed (All Saints' Day might affect these hours)",
+        "monday": "10 AM–5 PM (All Souls Day might affect these hours)",
+        "tuesday": "10 AM–5 PM",
+        "wednesday": "10 AM–5 PM",
+        "thursday": "10 AM–5 PM",
+        "friday": "10 AM–5 PM"
+      },
+      "phone": "+351 21 354 7892",
+      "website": "http://www.museumedeirosealmeida.pt/",
+      "description": "Museum with historical art & objects. Elegant museum in former mansion with historical silverware, European paintings & Chinese porcelain.",
+      "extensions": [
+        {
+          "accessibility": [
+            "Assisted listening devices",
+            "Wheelchair accessible entrance",
+            "Wheelchair accessible restroom"
+          ]
+        }
+      ],
+      "thumbnail": "https://lh3.googleusercontent.com/grass-cs/AABkmLcD_Xl31l779NG61aO-kC3JK2oQpPxcHZJa-7o2igxa_022IAC27OaOT5qSA-ffQiAJZyIGyaESNfZY2ZxLTab4orfCePLY7bNqRCHkFZQlD6ZKkUSndEiNZDnTgbo5F1VU3qzqV0pUeBBN=w1000-h1000-c-n",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/KyhiAHicHcTNboMgAADgJ6IiriVbsgNq_6zBOrVZuTTIEI0UVFxm95I7722W7Dt8vz_tPA_uxfN0G6yUtUrLTycnYc0szbwS9u6piTsHhPMICft7KuLbuw58jfEz3W98noE-CpITsvlwXsSBJRxgizq18BtE6EgihDOeleuxIKBp8o4k7HHcP_i2oA27IrakJa-f7NRE8pxecU3Ht-jQ71iu4w079VVhPrYdZbEpVW3XO_9SBeP3eIFDJcOQvn75EELQ_i-A-QO-WUVw"
+    },
+    {
+      "position": 17,
+      "title": "Museu Benfica – Cosme Damião",
+      "place_id": "ChIJg2MEG9YyGQ0R-Z_RfM0oIps",
+      "data_id": "0xd1932d61b046383:0x9b2228cd7cd19ff9",
+      "data_cid": "11178542088114511865",
+      "reviews_link": "https://serpapi.com/search.json?data_id=0xd1932d61b046383%3A0x9b2228cd7cd19ff9&engine=google_maps_reviews&hl=en",
+      "photos_link": "https://serpapi.com/search.json?data_id=0xd1932d61b046383%3A0x9b2228cd7cd19ff9&engine=google_maps_photos&hl=en",
+      "gps_coordinates": {
+        "latitude": 38.751421,
+        "longitude": -9.184344
+      },
+      "place_id_search": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&place_id=ChIJg2MEG9YyGQ0R-Z_RfM0oIps",
+      "provider_id": "/m/0ywzhvf",
+      "rating": 4.8,
+      "reviews": 3929,
+      "type": "Museum",
+      "types": [
+        "Museum",
+        "Tourist attraction"
+      ],
+      "address": "Av. Eusébio da Silva Ferreira Porta 9, 1500-313 Lisboa, Portugal",
+      "country": "Portugal",
+      "open_state": "Open · Closes 6 PM",
+      "hours": "Open · Closes 6 PM",
+      "operating_hours": {
+        "saturday": "10 AM–6 PM",
+        "sunday": "10 AM–6 PM (All Saints' Day hours)",
+        "monday": "Closed (All Souls Day hours)",
+        "tuesday": "10 AM–6 PM",
+        "wednesday": "10 AM–6 PM",
+        "thursday": "Closed",
+        "friday": "10 AM–6 PM"
+      },
+      "phone": "+351 21 721 9590",
+      "website": "https://www.slbenfica.pt/loja/bilhetes/estadio-e-museu/visitas/visita?utm_medium=google&utm_source=google-my-business&utm_campaign=estadio-e-museu",
+      "extensions": [
+        {
+          "accessibility": [
+            "Wheelchair accessible entrance",
+            "Wheelchair accessible parking lot",
+            "Wheelchair accessible restroom"
+          ]
+        }
+      ],
+      "thumbnail": "https://lh3.googleusercontent.com/grass-cs/AABkmLcie00ZrpH3MjSdgKbhpwAYvTUWPIXxoy7Z-zCarcsskbSNfB5WlQTIeysAVD3sEYbWabvINLPulkGphLPa1ERKe7W1wmUaJ7jUE7u7GznhhcDepTKez3XEjK26temVR9aSrrp7Zw=w1000-h1000-c-n",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/u4ljGnicHcTdboIwGADQJ0LKiDYu8QInUQYzTECUu1K_Uflr06-I8oY-gm9jsnNxXk9hjMJP226FO6ukrFoYEDSXvYHezLjs7EozRIuj7Xnrpov4FQgptNq5P3VyqcJSqNE739Isj4PTXT5oYU1fTHPEpkz2f-t53v6mATzQO25c9M9lzspbsI_ioW22SkQxc_xDCDR3xi5j37TOfDrQ7dQLwTeg0hAm9-TX4cfCQHc8LFmitaLFuBodQogl_udW_wahcUcG"
+    },
+    {
+      "position": 18,
+      "title": "Museu Nacional de Etnologia",
+      "place_id": "ChIJo00_317LHg0R_9LwtHvVpFM",
+      "data_id": "0xd1ecb5edf3f4da3:0x53a4d57bb4f0d2ff",
+      "data_cid": "6027176928621941503",
+      "reviews_link": "https://serpapi.com/search.json?data_id=0xd1ecb5edf3f4da3%3A0x53a4d57bb4f0d2ff&engine=google_maps_reviews&hl=en",
+      "photos_link": "https://serpapi.com/search.json?data_id=0xd1ecb5edf3f4da3%3A0x53a4d57bb4f0d2ff&engine=google_maps_photos&hl=en",
+      "gps_coordinates": {
+        "latitude": 38.7048464,
+        "longitude": -9.2084614
+      },
+      "place_id_search": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&place_id=ChIJo00_317LHg0R_9LwtHvVpFM",
+      "provider_id": "/m/05p6gw2",
+      "rating": 4.2,
+      "reviews": 1115,
+      "unclaimed_listing": true,
+      "type": "Ethnographic museum",
+      "types": [
+        "Ethnographic museum",
+        "Museum",
+        "National museum",
+        "Tourist attraction"
+      ],
+      "address": "Av. da Ilha da Madeira, 1400-203 Lisboa, Portugal",
+      "country": "Portugal",
+      "open_state": "Open · Closes 6 PM",
+      "hours": "Open · Closes 6 PM",
+      "operating_hours": {
+        "saturday": "10 AM–6 PM",
+        "sunday": "10 AM–6 PM (All Saints' Day might affect these hours)",
+        "monday": "10 AM–6 PM (All Souls Day might affect these hours)",
+        "tuesday": "Closed",
+        "wednesday": "10 AM–6 PM",
+        "thursday": "10 AM–6 PM",
+        "friday": "10 AM–6 PM"
+      },
+      "phone": "+351 21 304 1160",
+      "website": "https://museudeetnologia.pt/",
+      "extensions": [
+        {
+          "accessibility": [
+            "Wheelchair accessible entrance",
+            "Wheelchair accessible parking lot",
+            "Wheelchair accessible restroom"
+          ]
+        }
+      ],
+      "thumbnail": "https://lh3.googleusercontent.com/grass-cs/AABkmLdjoa2pbE5ftTFRgtLpci5N8Yvupz9Tdlrgo3xza-G5eUaSIo4TqPuznHb8ks7bwk1h4QwUTmAYCWzz_v_3lvZ5rqA4V__6Ff4Ak_27Mil-R0SzzdB6GQvSlfMFwfG3Z_basC0M=w1000-h1000-c-n",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/TsOW8HicHcTbDoIgAADQLyIptdvWA7a0tmx5qWYvDFGxRDFBbfxg39DftHUezvdTKtXKtWHw0pwwIRjPe5l3VDQqb9SEitpgHZESUGkg5FT1MXsKMmvTnV2o2A2ZOrb0YZ-WydC3ehVnvGPCfGsCPDu_kOggrPh17nWzT5eVXKRjNS2tYLzENUq2N63xgE0-3O3uhawrxnO3sFCFZwv_wUEII60zZ-4FQ8QL3x0Lz7zjlMgt9DfjFEIIyv8UND8oYEYO"
+    },
+    {
+      "position": 19,
+      "title": "Lisbon Story Centre",
+      "place_id": "ChIJZ0MHGXo0GQ0RLMaWtihDkQE",
+      "data_id": "0xd19347a19074367:0x1914328b696c62c",
+      "data_cid": "112945307802060332",
+      "reviews_link": "https://serpapi.com/search.json?data_id=0xd19347a19074367%3A0x1914328b696c62c&engine=google_maps_reviews&hl=en",
+      "photos_link": "https://serpapi.com/search.json?data_id=0xd19347a19074367%3A0x1914328b696c62c&engine=google_maps_photos&hl=en",
+      "gps_coordinates": {
+        "latitude": 38.707898899999996,
+        "longitude": -9.135365199999999
+      },
+      "place_id_search": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&place_id=ChIJZ0MHGXo0GQ0RLMaWtihDkQE",
+      "provider_id": "/g/11h1tdys5",
+      "rating": 4.3,
+      "reviews": 3016,
+      "unclaimed_listing": true,
+      "type": "Museum",
+      "types": [
+        "Museum",
+        "Cultural center",
+        "Tourist attraction"
+      ],
+      "address": "Praça do Comércio 78, 1100-148 Lisboa, Portugal",
+      "country": "Portugal",
+      "open_state": "Open · Closes 7 PM",
+      "hours": "Open · Closes 7 PM",
+      "operating_hours": {
+        "saturday": "10 AM–7 PM",
+        "sunday": "10 AM–7 PM (All Saints' Day might affect these hours)",
+        "monday": "10 AM–7 PM (All Souls Day might affect these hours)",
+        "tuesday": "10 AM–7 PM",
+        "wednesday": "10 AM–7 PM",
+        "thursday": "10 AM–7 PM",
+        "friday": "10 AM–7 PM"
+      },
+      "phone": "+351 21 194 1099",
+      "website": "http://www.lisboastorycentre.pt/",
+      "description": "Museum depicting the history of Lisbon. With dramatic sets & multimedia exhibits, this museum offers a 60-minute tour of Lisbon's history.",
+      "extensions": [
+        {
+          "accessibility": [
+            "Wheelchair accessible entrance",
+            "Wheelchair accessible restroom"
+          ]
+        }
+      ],
+      "thumbnail": "https://lh3.googleusercontent.com/grass-cs/AABkmLe17jcDToVAVZ6_lx4bFpOWyoPkEw0Cui7WWzTdrY7w7x2o7jtoNR109imRCWKw1qyDGUsHXuk_x4H8c6XGkCcR5JZCGppWR6e5-9Zio-H-IzyAwaUhM5_vKNt_iv108_vanHTP=w1000-h1000-c-n",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/suAFt3icHcTbboIwGADgJ6q0Tqgu2QXiBI8zBK1y07DaAHL4kRYKvuCeYW-zZN_F9_uTad2od8sqs7dJCpCWslOyFVBrWeuJgMpK20QpJJTlusui2ktCH2IVwcW9xA4vh9n3uvliI5yKT4O9LqeMvaJ7e6OGDlOgDw3HkOBFXoUe2xnyHFf-WQXXruDDLJgL5-oXngjtbez5TcNCR9poEeeAArR5ja5JztnB5v3uqHneEzznfVIH0enDEIwxyv4XqP4DiBlEsA"
+    },
+    {
+      "position": 20,
+      "title": "Tejo Power Station",
+      "place_id": "ChIJaRCJfU7LHg0RVKReu6stbhU",
+      "data_id": "0xd1ecb4e7d891069:0x156e2dabbb5ea454",
+      "data_cid": "1544221937840858196",
+      "reviews_link": "https://serpapi.com/search.json?data_id=0xd1ecb4e7d891069%3A0x156e2dabbb5ea454&engine=google_maps_reviews&hl=en",
+      "photos_link": "https://serpapi.com/search.json?data_id=0xd1ecb4e7d891069%3A0x156e2dabbb5ea454&engine=google_maps_photos&hl=en",
+      "gps_coordinates": {
+        "latitude": 38.695667799999995,
+        "longitude": -9.1953114
+      },
+      "place_id_search": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&place_id=ChIJaRCJfU7LHg0RVKReu6stbhU",
+      "provider_id": "/m/0gff5dg",
+      "rating": 4.6,
+      "reviews": 2899,
+      "unclaimed_listing": true,
+      "type": "Museum",
+      "types": [
+        "Museum",
+        "Historical landmark"
+      ],
+      "address": "Av. Brasília, 1300-598 Lisboa, Portugal",
+      "country": "Portugal",
+      "open_state": "Open · Closes 7 PM",
+      "hours": "Open · Closes 7 PM",
+      "operating_hours": {
+        "saturday": "10 AM–7 PM",
+        "sunday": "10 AM–7 PM (All Saints' Day might affect these hours)",
+        "monday": "10 AM–7 PM (All Souls Day might affect these hours)",
+        "tuesday": "Closed",
+        "wednesday": "10 AM–7 PM",
+        "thursday": "10 AM–7 PM",
+        "friday": "10 AM–7 PM"
+      },
+      "phone": "+351 21 002 8130",
+      "website": "http://www.maat.pt/",
+      "extensions": [
+        {
+          "accessibility": [
+            "Wheelchair accessible entrance",
+            "Wheelchair accessible parking lot",
+            "Wheelchair accessible restroom"
+          ]
+        }
+      ],
+      "thumbnail": "https://lh3.googleusercontent.com/grass-cs/AABkmLehBk53mYX2mMqLtE0mxLXGM76D_D2tYfd8njbBJHjFBSThQJ6jQAENH8DMTnzH7A0yIW8GlFPkWVsbR2Zmhg4lzKGGWdjpzuGq1UTAiKRHprmhf-Dp_vZL9MPpQeVvckWibh1q=w1000-h1000-c-n",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/wVXDBXicHcRJDoIwAADAFyEFNzTxUAIWFYwognIxUisVaCm0bnzQN_gbE-cw3w9VSsiprle038vrOq_IXZIW11wRrnq4ZnrenqXUsNQhtEvmE2qXwz47HkwWNL5yAXv5BxSMR87JMdXxerF4kdlLr5jbu4iGy1ERQnftWU4Q8c4bQ_BeJBaq5psyiWW2NVNG80HVrRBKLoXo7qgx9hG8rbaeaBm9ao44PVJ_EmxESOIHLpNbRo1m9jQAABr9jzX-AzZ5RMg"
+    }
+  ],
+  "serpapi_pagination": {
+    "next": "https://serpapi.com/search.json?engine=google_maps&google_domain=google.com&hl=en&ll=%4038.7077507%2C-9.1365919%2C13z&q=museums&start=20&type=search"
+  }
+}
