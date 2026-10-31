@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth/guards';
+import { getCurrentUser, isUuid } from '@/lib/auth/guards';
 import { getTripVersion, isMember } from '@/lib/services/trips';
 
 export async function GET(
@@ -8,7 +8,7 @@ export async function GET(
 ) {
   const { tripId } = await ctx.params;
   const user = await getCurrentUser();
-  if (!user) {
+  if (!user || !isUuid(tripId)) {
     return NextResponse.json({ error: 'not found' }, { status: 404 });
   }
   const member = await isMember(tripId, user.id);

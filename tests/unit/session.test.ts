@@ -24,13 +24,21 @@ describe('safeNextPath', () => {
   it('accepts same-origin relative paths', () => {
     expect(safeNextPath('/trips')).toBe('/trips');
     expect(safeNextPath('/invite/abc?x=1')).toBe('/invite/abc?x=1');
+    expect(safeNextPath('/trips/abc?x=1#y')).toBe('/trips/abc?x=1#y');
   });
 
   it('rejects absolute and protocol-relative URLs', () => {
     expect(safeNextPath('https://evil.example.com')).toBeNull();
-    expect(safeNextPath('//evil.example.com/x')).toBeNull();
+    expect(safeNextPath('//evil.com')).toBeNull();
     expect(safeNextPath('javascript:alert(1)')).toBeNull();
     expect(safeNextPath('')).toBeNull();
     expect(safeNextPath(null)).toBeNull();
+  });
+
+  it('rejects backslashes and control characters browsers would normalize', () => {
+    expect(safeNextPath('/\\evil.com')).toBeNull();
+    expect(safeNextPath('/\\\\evil.com')).toBeNull();
+    expect(safeNextPath('/\t/evil.com')).toBeNull();
+    expect(safeNextPath('/trips\n/x')).toBeNull();
   });
 });

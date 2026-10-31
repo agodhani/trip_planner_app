@@ -44,6 +44,8 @@ export async function cachedCall<T>(
   opts: CachedCallOpts,
   fn: () => Promise<T>,
 ): Promise<T> {
+  // Smoke scripts (SKIP_DB=1) run providers without a database.
+  if (process.env.SKIP_DB === '1') return fn();
   const key = fixtureKey(opts.provider, opts.operation, opts.request);
   const now = new Date();
 

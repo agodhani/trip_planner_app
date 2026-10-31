@@ -11,11 +11,22 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   return getSessionUser();
 });
 
+const UNSAFE_NEXT = /[\x00-\x1f\x7f\\]/;
 /** Accept only same-origin relative paths for `next` redirect targets. */
 export function safeNextPath(next: string | null | undefined): string | null {
   if (!next) return null;
   if (!next.startsWith('/') || next.startsWith('//')) return null;
+  // Browsers normalize `\` to `/`, and control characters can smuggle
+  // protocol-relative URLs or newlines through the `//` check.
+  if (UNSAFE_NEXT.test(next)) return null;
   return next;
+}
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isUuid(value: string): boolean {
+  return UUID_RE.test(value);
 }
 
 export async function requireUser(nextPath = '/trips'): Promise<SessionUser> {
@@ -65,6 +76,7 @@ export async function requireTripRole(
   min: MemberRole,
 ): Promise<{ user: SessionUser; role: MemberRole }> {
   const user = await requireUser(`/trips/${tripId}`);
+  if (!isUuid(tripId)) notFound();
   const role = await getTripRole(tripId, user.id);
   if (!role) notFound();
   if (!roleAtLeast(role, min)) {

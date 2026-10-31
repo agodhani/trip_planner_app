@@ -6,6 +6,7 @@ import {
   RevokeInviteButton,
 } from '@/components/people-controls';
 import { requireTripRole } from '@/lib/auth/guards';
+import { formatDate } from '@/lib/format';
 import { listInvites } from '@/lib/services/invites';
 import { listMembers } from '@/lib/services/members';
 import { listTravelers } from '@/lib/services/travelers';
@@ -79,7 +80,7 @@ export default async function PeoplePage({
                     className="flex items-center justify-between gap-2 text-sm"
                   >
                     <span>
-                      {i.role} · expires {i.expiresAt.toLocaleDateString()} ·{' '}
+                      {i.role} · expires {formatDate(i.expiresAt, user.homeTimezone)} ·{' '}
                       {i.uses} use{i.uses === 1 ? '' : 's'}
                     </span>
                     <RevokeInviteButton tripId={tripId} inviteId={i.id} />

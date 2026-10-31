@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Circle } from 'lucide-react';
 import { CommentForm } from '@/components/comment-form';
 import { requireTripRole } from '@/lib/auth/guards';
+import { formatDateTime } from '@/lib/format';
 import { listActivity, listTripComments } from '@/lib/services/comments';
 
 const FLOW = [
@@ -26,7 +27,7 @@ export default async function TripOverviewPage({
   params: Promise<{ tripId: string }>;
 }) {
   const { tripId } = await params;
-  await requireTripRole(tripId, 'viewer');
+  const { user } = await requireTripRole(tripId, 'viewer');
   const [comments, activity] = await Promise.all([
     listTripComments(tripId),
     listActivity(tripId),
@@ -72,7 +73,7 @@ export default async function TripOverviewPage({
                   <div className="mb-0.5 flex items-baseline gap-2">
                     <span className="font-medium">{c.authorName}</span>
                     <time className="text-xs text-neutral-500">
-                      {c.createdAt.toLocaleString()}
+                      {formatDateTime(c.createdAt, user.homeTimezone)}
                     </time>
                   </div>
                   <p className="whitespace-pre-wrap">{c.body}</p>
@@ -93,7 +94,7 @@ export default async function TripOverviewPage({
               <li key={e.id} className="text-sm">
                 <p>{e.summary}</p>
                 <time className="text-xs text-neutral-500">
-                  {e.createdAt.toLocaleString()}
+                  {formatDateTime(e.createdAt, user.homeTimezone)}
                 </time>
               </li>
             ))}

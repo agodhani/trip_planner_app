@@ -1,11 +1,12 @@
 import 'server-only';
 import { createHash, randomBytes } from 'node:crypto';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { tripInvites, tripMembers, travelers, trips, users } from '@/lib/db/schema';
 import type { MemberRole } from '@/lib/db/schema';
 import { roleAtLeast } from '@/lib/auth/guards';
 import { env } from '@/lib/env';
+import { assertTripRole } from './access';
 import { recordEvent } from './events';
 
 export type InviteRole = Exclude<MemberRole, 'owner'>;
@@ -30,6 +31,7 @@ export async function createInvite(
   role: InviteRole,
   expiryDays: number,
 ): Promise<{ invite: InviteInfo; url: string }> {
+  await assertTripRole(tripId, actor.id, 'owner');
   const days = Math.min(Math.max(1, Math.round(expiryDays)), MAX_EXPIRY_DAYS);
   const token = randomBytes(32).toString('base64url');
   const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
@@ -93,6 +95,7 @@ export async function revokeInvite(
   tripId: string,
   inviteId: string,
 ): Promise<void> {
+  await assertTripRole(tripId, actor.id, 'owner');
   await db.transaction(async (tx) => {
     await tx
       .update(tripInvites)
@@ -219,7 +222,7 @@ export async function acceptInvite(
 
     await tx
       .update(tripInvites)
-      .set({ uses: invite.uses + 1 })
+      .set({ uses: sql`${tripInvites.uses} + 1` })
       .where(eq(tripInvites.id, invite.id));
 
     await recordEvent(tx, {

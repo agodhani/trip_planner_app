@@ -26,7 +26,9 @@ import { users } from '@/lib/db/schema';
 export type AuthFormState = { error?: string };
 
 const signupSchema = z.object({
-  email: z.email('Enter a valid email address').max(320),
+  email: z
+    .preprocess((v) => (typeof v === 'string' ? v.trim() : v), z.string())
+    .pipe(z.email('Enter a valid email address').max(320)),
   name: z.string().trim().min(1, 'Name is required').max(120),
   password: z
     .string()
@@ -67,15 +69,27 @@ export async function signup(
     return { error: 'An account with that email already exists' };
   }
 
-  const [user] = await db
-    .insert(users)
-    .values({
-      email,
-      name,
-      passwordHash: hashPassword(password),
-      homeTimezone,
-    })
-    .returning({ id: users.id });
+  let user: { id: string };
+  try {
+    [user] = await db
+      .insert(users)
+      .values({
+        email,
+        name,
+        passwordHash: await hashPassword(password),
+        homeTimezone,
+      })
+      .returning({ id: users.id });
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      'code' in err &&
+      (err as { code?: string }).code === '23505'
+    ) {
+      return { error: 'An account with that email already exists' };
+    }
+    throw err;
+  }
 
   await createSession(user.id);
   redirect(safeNextPath(parsed.data.next) ?? '/trips');
@@ -118,7 +132,7 @@ export async function login(
     .limit(1);
 
   const user = rows[0];
-  if (!user || !verifyPassword(parsed.data.password, user.passwordHash)) {
+  if (!user || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
     recordLoginFailure(ip, email);
     return { error: 'Incorrect email or password' };
   }

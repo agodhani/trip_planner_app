@@ -2,6 +2,7 @@ import { AppNav } from '@/components/app-nav';
 import { TripWizard } from '@/components/trip-wizard';
 import { requireUser } from '@/lib/auth/guards';
 import { env } from '@/lib/env';
+import { todayISO } from '@/lib/clock';
 
 export default async function NewTripPage() {
   const user = await requireUser('/trips/new');
@@ -14,6 +15,7 @@ export default async function NewTripPage() {
           homeTimezone={user.homeTimezone}
           defaultCurrency={user.defaultCurrency}
           maxPairs={env.FLIGHT_SCAN_MAX_PAIRS}
+          today={todayISO(user.homeTimezone)}
         />
       </main>
     </>

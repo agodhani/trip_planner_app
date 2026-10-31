@@ -2,6 +2,7 @@ import { AppNav } from '@/components/app-nav';
 import { ProfileForm } from '@/components/profile-form';
 import { requireUser } from '@/lib/auth/guards';
 import { getSerpApiAccount } from '@/lib/providers/serpapi/account';
+import { GfTestButton } from '@/components/gf-test';
 
 const cardCls = 'rounded-xl border border-neutral-200 bg-white p-5 shadow-sm';
 
@@ -33,6 +34,7 @@ export default async function SettingsPage() {
                   Free, no key needed. Results are read from the public Google
                   Flights page.
                 </p>
+                <GfTestButton />
               </li>
               <li className="rounded-lg border border-neutral-200 p-3">
                 <p className="font-medium">SerpApi</p>

@@ -48,3 +48,22 @@ contributors, licensed under the Open Database License (ODbL).
 - OSRM demo server and FOSSGIS routing — OSM data.
 - Transitous — <https://transitous.org>.
 - Frankfurter currency rates (ECB) — <https://www.frankfurter.dev>.
+
+## fli (Google Flights reader reference implementation)
+
+- **Source**: https://github.com/punitarani/fli — commit
+  881aee5ff4321e81ea2157cb44be94ce6a21dc1b.
+- **License**: MIT. Portions of `src/lib/providers/googleFlights/` (tfs.ts,
+  decode.ts, fetch.ts, index.ts) are TypeScript ports of fli's
+  `search/_proto.py`, `search/_tfs.py`, `search/_decoders.py`,
+  `search/client.py`, `search/flights.py`, and `core/links.py`.
+
+MIT License — Copyright (c) fli contributors. Permission is hereby granted,
+free of charge, to any person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the Software without
+restriction, including without limitation the rights to use, copy, modify,
+merge, publish, distribute, sublicense, and/or sell copies of the Software,
+and to permit persons to whom the Software is furnished to do so, subject to
+the following conditions: the above copyright notice and this permission
+notice shall be included in all copies or substantial portions of the
+Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.

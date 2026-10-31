@@ -89,16 +89,19 @@ function buildCityGroup(
   city: string,
   country: string,
 ): CityGroup {
-  const members = airports
+  const own = airports
     .filter((a) => a.city === city && a.country === country)
     .sort(compareAirports);
-  const primary = members[0];
+  const primary = own[0];
+  // The city's own airports of any size, plus large/medium airports of
+  // neighbouring municipalities within 70 km of the primary.
   const groupAirports = all
     .filter(
       (a) =>
-        a.size !== 'small' &&
-        haversineKm(a.lat, a.lon, primary.lat, primary.lon) <=
-          CITY_GROUP_RADIUS_KM,
+        (a.city === city && a.country === country) ||
+        (a.size !== 'small' &&
+          haversineKm(a.lat, a.lon, primary.lat, primary.lon) <=
+            CITY_GROUP_RADIUS_KM),
     )
     .sort(compareAirports);
   return {
@@ -133,7 +136,7 @@ export async function searchPlaces(
 ): Promise<PlaceSearchResult[]> {
   const all = await load();
   const nq = normalizeText(q);
-  if (!nq) return [];
+  if (nq.length < 2) return [];
 
   const results: PlaceSearchResult[] = [];
 
@@ -144,24 +147,31 @@ export async function searchPlaces(
     if (exact) results.push(airportResult(exact));
   }
 
-  const cityKeys = new Map<string, { city: string; country: string }>();
+  // Candidate (city, country) keys, ranked by best airport size then name;
+  // only the top 20 get the O(dataset) group expansion.
+  const cityKeys = new Map<
+    string,
+    { city: string; country: string; best: number }
+  >();
   for (const a of all) {
     if (!a.city) continue;
     if (normalizeText(a.city).startsWith(nq)) {
-      cityKeys.set(`${a.city}||${a.country}`, { city: a.city, country: a.country });
+      const key = `${a.city}||${a.country}`;
+      const cur = cityKeys.get(key);
+      const rank = SIZE_RANK[a.size];
+      if (!cur || rank < cur.best) {
+        cityKeys.set(key, { city: a.city, country: a.country, best: rank });
+      }
     }
   }
-  const groups = [...cityKeys.values()]
-    .map(({ city, country }) => buildCityGroup(all, all, city, country))
+  const topCities = [...cityKeys.values()]
     .sort(
-      (a, b) =>
-        SIZE_RANK[bySize(a.airports)] - SIZE_RANK[bySize(b.airports)] ||
-        a.label.localeCompare(b.label),
-    );
-
-  function bySize(airports: Airport[]): 'large' | 'medium' | 'small' {
-    return airports[0]?.size ?? 'small';
-  }
+      (a, b) => a.best - b.best || a.city.localeCompare(b.city),
+    )
+    .slice(0, 20);
+  const groups = topCities
+    .map(({ city, country }) => buildCityGroup(all, all, city, country))
+    .filter((g) => g.airports.length > 0);
 
   const nameMatches = all
     .filter((a) => normalizeText(a.name).includes(nq))

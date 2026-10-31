@@ -40,6 +40,21 @@ describe('airport place search', () => {
     }
   });
 
+  it('keeps a city group whose airports are all small', async () => {
+    // Buariki, KI (AAK) has only a small airport — the group must not drop it.
+    const results = await searchPlaces('buariki');
+    const group = results.find((r) => r.type === 'city');
+    expect(group).toBeDefined();
+    if (group?.type === 'city') {
+      expect(group.airports.map((a) => a.iata)).toContain('AAK');
+    }
+  });
+
+  it('returns nothing for queries shorter than 2 characters', async () => {
+    expect(await searchPlaces('a')).toEqual([]);
+    expect(await searchPlaces(' ')).toEqual([]);
+  });
+
   it('empty query returns nothing; getAirport resolves by IATA', async () => {
     expect(await searchPlaces('')).toEqual([]);
     const jfk = await getAirport('jfk');

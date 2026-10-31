@@ -1,6 +1,5 @@
 'use client';
 
-import { DateTime } from 'luxon';
 import { useActionState, useMemo, useState } from 'react';
 import { createTripAction, type TripFormState } from '@/lib/actions/trips';
 import {
@@ -43,10 +42,12 @@ export function TripWizard({
   homeTimezone,
   defaultCurrency,
   maxPairs,
+  today,
 }: {
   homeTimezone: string;
   defaultCurrency: string;
   maxPairs: number;
+  today: string;
 }) {
   const [state, action, pending] = useActionState<TripFormState, FormData>(
     createTripAction,
@@ -90,10 +91,11 @@ export function TripWizard({
     switch (kind) {
       case 'exact':
         if (!exactDepart) return null;
+        if (!oneWay && !exactReturn) return null;
         return {
           kind: 'exact',
           departDate: exactDepart,
-          returnDate: oneWay ? null : exactReturn || null,
+          returnDate: oneWay ? null : exactReturn,
         };
       case 'weekends_in_month':
         if (!month) return null;
@@ -140,7 +142,6 @@ export function TripWizard({
     return { timezone: tz, outboundDepart, returnDepart };
   }, [tz, outEnabled, outStart, outEnd, retEnabled, retStart, retEnd]);
 
-  const today = DateTime.now().setZone(tz || homeTimezone).toFormat('yyyy-MM-dd');
 
   const pairsInfo = useMemo(() => {
     if (!strategy) return null;
@@ -165,6 +166,18 @@ export function TripWizard({
     strategy.returnDate <= strategy.departDate
   )
     clientErrors.push('Return date must be after the departure date.');
+
+  if (
+    kind === 'exact' &&
+    exactDepart &&
+    !oneWay &&
+    !exactReturn
+  )
+    clientErrors.push('Pick a return date or choose One-way.');
+  if (outEnabled && outStart >= outEnd)
+    clientErrors.push('Outbound window start must be before its end.');
+  if (retEnabled && retStart >= retEnd)
+    clientErrors.push('Return window start must be before its end.');
 
   const canSubmit =
     !!origin && !!destination && !!strategy && clientErrors.length === 0;

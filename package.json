@@ -14,7 +14,8 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "db:studio": "drizzle-kit studio",
     "data:airports": "tsx scripts/build-airports.ts",
-    "fixtures:record": "NODE_OPTIONS=--conditions=react-server tsx scripts/record-fixtures.ts"
+    "fixtures:record": "NODE_OPTIONS=--conditions=react-server tsx scripts/record-fixtures.ts",
+    "smoke:flights": "NODE_OPTIONS=--conditions=react-server tsx scripts/smoke-flights.ts"
   },
   "dependencies": {
     "drizzle-orm": "0.45.4",

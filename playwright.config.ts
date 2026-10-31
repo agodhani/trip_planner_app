@@ -17,6 +17,7 @@ export default defineConfig({
         'postgres://tripplanner:tripplanner@localhost:5434/tripplanner_test',
       APP_URL: 'http://localhost:3100',
       PROVIDER_FIXTURES_DIR: 'tests/fixtures',
+      TP_TEST_NOW: '2026-10-30T12:00:00Z',
     },
   },
 });

@@ -1,8 +1,10 @@
 'use server';
 
+import { DateTime } from 'luxon';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/guards';
+import { getAirport } from '@/lib/providers/airports';
 import { createTrip } from '@/lib/services/trips';
 
 export type TripFormState = { error?: string };
@@ -19,10 +21,15 @@ const placeSelection = z.object({
   primaryIata: z.string().length(3),
 });
 
-const timeWindow = z.object({
-  start: z.string().regex(/^\d{2}:\d{2}$/),
-  end: z.string().regex(/^\d{2}:\d{2}$/),
-});
+const hhmm = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Times must be valid HH:mm');
+
+const timeWindow = z
+  .object({ start: hhmm, end: hhmm })
+  .refine((w) => w.start < w.end, {
+    message: 'Window start must be before its end',
+  });
 
 const dateStrategy = z.discriminatedUnion('kind', [
   z.object({
@@ -66,10 +73,16 @@ const payloadSchema = z.object({
   childrenAges: z.array(z.number().int().min(0).max(17)).max(8),
   cabin: z.enum(['economy', 'premium_economy', 'business', 'first']),
   maxStops: z.enum(['any', 'nonstop', 'one', 'two']),
-  currency: z.string().length(3),
+  currency: z.string().regex(/^[A-Z]{3}$/, 'Currency must be a 3-letter code'),
   dateStrategy,
   timePrefs: z.object({
-    timezone: z.string().max(60).optional(),
+    timezone: z
+      .string()
+      .max(60)
+      .refine((tz) => !tz || DateTime.now().setZone(tz).isValid, {
+        message: 'Timezone must be a valid IANA zone',
+      })
+      .optional(),
     outboundDepart: timeWindow.optional(),
     returnDepart: timeWindow.optional(),
   }),
@@ -105,6 +118,24 @@ export async function createTripAction(
   if (p.dateStrategy.kind === 'range' && p.dateStrategy.minNights > p.dateStrategy.maxNights) {
     return { error: 'Minimum nights cannot exceed maximum nights' };
   }
+  if (
+    p.dateStrategy.kind === 'exact' &&
+    p.dateStrategy.returnDate !== null &&
+    p.dateStrategy.returnDate <= p.dateStrategy.departDate
+  ) {
+    return { error: 'Return date must be after the departure date' };
+  }
+
+  for (const sel of [p.origin, p.destination]) {
+    for (const iata of [...sel.airports, sel.primaryIata]) {
+      if (!(await getAirport(iata))) {
+        return { error: `Unknown airport code ${iata}` };
+      }
+    }
+    if (!sel.airports.includes(sel.primaryIata)) {
+      return { error: 'The primary airport must be one of the selected airports' };
+    }
+  }
 
   const trip = await createTrip(user, {
     name: p.name,
@@ -114,9 +145,12 @@ export async function createTripAction(
     childrenAges: p.childrenAges,
     cabin: p.cabin,
     maxStops: p.maxStops,
-    currency: p.currency.toUpperCase(),
+    currency: p.currency,
     dateStrategy: p.dateStrategy,
-    timePrefs: p.timePrefs,
+    timePrefs: {
+      ...p.timePrefs,
+      timezone: p.timePrefs.timezone || user.homeTimezone,
+    },
   });
   redirect(`/trips/${trip.id}`);
 }

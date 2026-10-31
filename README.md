@@ -31,6 +31,14 @@ together, via invite links.
    npm run dev   # http://localhost:3030
    ```
 
+### Live checks
+
+- `npm run smoke:flights -- JFK LIS 2026-12-04 2026-12-07` — fetches a real Google Flights page (no DB) and prints the top 5 itineraries. Run this first when flight results look wrong: it isolates the reader from the app.
+
+### Google Flights fragility
+
+The flights reader scrapes the public `/travel/flights` page (`ds:1` payload), not an API. Google may change the payload shape, serve a consent interstitial (mapped to a `blocked` error), or throttle (403/429 ⇒ `blocked`). Trips keep working — manual flight entry is always available.
+
 ## Scripts
 
 | Command | Purpose |

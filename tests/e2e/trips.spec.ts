@@ -31,6 +31,12 @@ test('logout then login returns to trips', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Your trips' })).toBeVisible();
 });
 
+test('a malformed trip URL gives 404', async ({ page }) => {
+  await signUp(page, 'E2E Uuid', uniqueEmail('uuid'));
+  const res = await page.goto('/trips/not-a-uuid');
+  expect(res?.status()).toBe(404);
+});
+
 test('a non-member opening a trip URL gets 404', async ({ page, browser }) => {
   await signUp(page, 'E2E Private', uniqueEmail('private'));
   await createTripWeekendsInNov2026(page);

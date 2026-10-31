@@ -2,6 +2,7 @@ import 'server-only';
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { travelers } from '@/lib/db/schema';
+import { assertTripRole } from './access';
 import { recordEvent } from './events';
 
 export type TravelerInfo = {
@@ -27,6 +28,7 @@ export async function addTraveler(
   tripId: string,
   displayName: string,
 ): Promise<void> {
+  await assertTripRole(tripId, actor.id, 'owner');
   await db.transaction(async (tx) => {
     await tx.insert(travelers).values({ tripId, displayName });
     await recordEvent(tx, {
@@ -45,6 +47,7 @@ export async function renameTraveler(
   travelerId: string,
   displayName: string,
 ): Promise<void> {
+  await assertTripRole(tripId, actor.id, 'owner');
   await db.transaction(async (tx) => {
     await tx
       .update(travelers)

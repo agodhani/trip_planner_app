@@ -1,7 +1,8 @@
 import 'server-only';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { activityEvents, comments, users } from '@/lib/db/schema';
+import { activityEvents, comments, tripOptions, users } from '@/lib/db/schema';
+import { assertTripRole, NotFoundError } from './access';
 import { recordEvent } from './events';
 
 export type CommentInfo = {
@@ -32,9 +33,21 @@ export async function addComment(
   user: { id: string; name: string },
   tripId: string,
   body: string,
+  optionId?: string,
 ): Promise<void> {
+  await assertTripRole(tripId, user.id, 'viewer');
   await db.transaction(async (tx) => {
-    await tx.insert(comments).values({ tripId, userId: user.id, body });
+    if (optionId) {
+      const opt = await tx
+        .select({ id: tripOptions.id })
+        .from(tripOptions)
+        .where(and(eq(tripOptions.id, optionId), eq(tripOptions.tripId, tripId)))
+        .limit(1);
+      if (!opt[0]) throw new NotFoundError('Option not found');
+    }
+    await tx
+      .insert(comments)
+      .values({ tripId, userId: user.id, body, optionId: optionId ?? null });
     await recordEvent(tx, {
       tripId,
       userId: user.id,

@@ -39,7 +39,8 @@ npm run test:e2e            # playwright (tests/e2e, test DB, fixture replay)
 npm run db:generate         # drizzle-kit generate -> drizzle/
 npm run db:migrate          # tsx scripts/migrate.ts (DATABASE_URL)
 npm run data:airports       # rebuild src/data/airports.json (committed)
-npm run fixtures:record     # record live provider responses into tests/fixtures
+npm run fixtures:record   # record live Nominatim + Google Flights responses into tests/fixtures
+npm run smoke:flights     # live Google Flights reader check: npm run smoke:flights -- JFK LIS 2026-12-04 2026-12-07
 ```
 
 ## Layout
