@@ -21,6 +21,7 @@ export default async function FlightsPage({ params }: { params: Promise<{ tripId
       canEdit={role !== 'viewer'}
       strategySummary={describeStrategy(trip.dateStrategy, trip.timePrefs)}
       hasKids={hasKids}
+      travelers={trip.adults + trip.childrenAges.length}
       initialSearch={search && {
         id: search.id, status: search.status, total: search.total,
         completed: search.completed, result: search.result as never, error: search.error,

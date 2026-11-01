@@ -19,5 +19,6 @@ test('activities: category search, shortlist, manual entry', async ({ page }) =>
   await page.getByRole('button', { name: 'Add manually' }).click();
   await page.getByPlaceholder('Activity name').fill('E2E Fado night');
   await page.getByRole('button', { name: 'Add', exact: true }).click();
-  await expect(page.getByText('manual').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('li', { hasText: 'E2E Fado night' }).getByText('manual', { exact: true }))
+    .toBeVisible({ timeout: 15_000 });
 });

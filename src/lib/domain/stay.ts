@@ -1,4 +1,5 @@
 import type { LodgingResult } from '@/lib/providers/types';
+import { money } from '@/lib/ui-format';
 
 /**
  * Rule-based lodging recommendation score, 0–100 with human-readable reasons.
@@ -7,8 +8,7 @@ import type { LodgingResult } from '@/lib/providers/types';
  */
 export type Scored<T> = T & { score: number; reasons: string[] };
 
-const fmtPrice = (n: number, currency: string) =>
-  `${currency} ${Math.round(n)}`;
+const fmtPrice = (n: number, currency: string) => money(n, currency || 'USD');
 
 export function scoreLodgings(
   results: LodgingResult[],

@@ -4,6 +4,7 @@ import { db } from '@/lib/db/client';
 import { expenses, expenseShares, itineraryItems, journalEntries, travelers, tripOptions, trips, users } from '@/lib/db/schema';
 import { fxRate } from '@/lib/providers/frankfurter';
 import { equalSplit, settleUp, toBaseCents, type Balance, type Transfer } from '@/lib/domain/money';
+import { money } from '@/lib/ui-format';
 import { assertTripRole, NotFoundError } from './access';
 import { recordEvent } from './events';
 import { getTrip } from './trips';
@@ -44,7 +45,7 @@ export async function addExpense(
     );
     await recordEvent(tx, {
       tripId, userId: user.id, verb: 'expense.added',
-      summary: `${user.name} logged ${input.description} (${input.currency} ${input.amount})`,
+      summary: `${user.name} logged ${input.description} (${money(input.amount, input.currency, 2)})`,
       entityType: 'expense', entityId: row.id,
     });
     return row;
@@ -84,6 +85,8 @@ export async function listExpenses(tripId: string) {
 
 export type BudgetSummary = {
   plannedByCategory: Record<string, number>;
+  /** Flights/lodging with nothing selected yet: cheapest shortlisted price. */
+  estimateByCategory: Record<string, { amount: number; count: number }>;
   actualByCategory: Record<string, number>;
   totalActualCents: number;
   balances: (Balance & { name: string })[];
@@ -97,11 +100,26 @@ export async function budgetSummary(tripId: string, currency: string): Promise<B
     listExpenses(tripId),
     listTravelers(tripId),
   ]);
+  // Planned = what the group committed to (selected/booked). Shortlisted
+  // alternatives are not summed — three candidate flights aren't three flights.
   const plannedByCategory: Record<string, number> = {};
+  const estimateByCategory: Record<string, { amount: number; count: number }> = {};
+  const catOf = (kind: string) =>
+    kind === 'flight' ? 'flights' : kind === 'lodging' ? 'lodging' : kind === 'transport' ? 'transport' : 'activities';
   for (const o of opts) {
-    if (o.status === 'rejected' || !o.priceAmount) continue;
-    const cat = o.kind === 'flight' ? 'flights' : o.kind === 'lodging' ? 'lodging' : o.kind === 'transport' ? 'transport' : 'activities';
+    if ((o.status !== 'selected' && o.status !== 'booked') || !o.priceAmount) continue;
+    const cat = catOf(o.kind);
     plannedByCategory[cat] = (plannedByCategory[cat] ?? 0) + Number(o.priceAmount);
+  }
+  for (const o of opts) {
+    const cat = catOf(o.kind);
+    if (o.status !== 'shortlisted' || !o.priceAmount || plannedByCategory[cat] !== undefined) continue;
+    if (cat !== 'flights' && cat !== 'lodging') continue;
+    const e = estimateByCategory[cat];
+    estimateByCategory[cat] = {
+      amount: e ? Math.min(e.amount, Number(o.priceAmount)) : Number(o.priceAmount),
+      count: (e?.count ?? 0) + 1,
+    };
   }
   const actualByCategory: Record<string, number> = {};
   const net = new Map<string, number>();
@@ -120,7 +138,7 @@ export async function budgetSummary(tripId: string, currency: string): Promise<B
   const transfers = settleUp(balances).map((t) => ({
     ...t, fromName: nameOf.get(t.from) ?? '?', toName: nameOf.get(t.to) ?? '?',
   }));
-  return { plannedByCategory, actualByCategory, totalActualCents: total, balances, transfers, currency };
+  return { plannedByCategory, estimateByCategory, actualByCategory, totalActualCents: total, balances, transfers, currency };
 }
 
 // ----- trip log -----

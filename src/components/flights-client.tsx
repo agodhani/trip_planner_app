@@ -1,14 +1,17 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useActionState, useEffect, useRef, useState } from 'react';
+import { useActionState, useEffect, useEffectEvent, useRef, useState } from 'react';
+import { ArrowLeft, Check, Clock, ExternalLink, Loader2 } from 'lucide-react';
 import {
   manualFlightAction, shortlistFlightAction, startScanAction,
 } from '@/lib/actions/flights';
-import { ShortlistedOptions } from '@/components/shortlisted-options';
+import { ShortlistedOptions, type ShortlistedOption } from '@/components/shortlisted-options';
+import { SubmitButton } from '@/components/submit-button';
 import type { ActionState } from '@/lib/actions/people';
 import { passesWindow } from '@/lib/domain/dates/windows';
-import { fmtMin, hhmm as t, isWellFormedItin, plusOne, stopsLabel } from '@/lib/domain/flight-rows';
+import { flightKey, fmtMin, hhmm as t, isWellFormedItin, plusOne } from '@/lib/domain/flight-rows';
+import { dayLabel, money, nightsBetween, plural, shortDate, weekday } from '@/lib/ui-format';
 
 type Pair = {
   depart: string; back: string | null; status: 'pending' | 'done' | 'error';
@@ -32,95 +35,131 @@ type Leg = {
   fromTz?: string; toTz?: string;
   durationMin: number; stops: number; airlines: string[];
 };
-type Opt = {
-  id: string; title: string; subtitle: string | null; status: string;
-  price: number | null; currency: string | null; bookingUrl: string | null;
-  bookingRef: string | null; source: string;
-  votes: { score: number; voters: { name: string; value: number }[] };
-  comments: { id: string; body: string; author: string }[];
-};
 
 const btn = 'rounded-lg bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50';
-const btn2 = 'rounded-md border border-neutral-300 px-2.5 py-1 text-xs text-neutral-700 hover:bg-neutral-100';
+const btn2 = 'inline-flex items-center gap-1 rounded-md border border-neutral-300 px-2.5 py-1 text-xs text-neutral-700 hover:bg-neutral-100 disabled:opacity-50';
+const btnSm = 'rounded-md bg-teal-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-teal-700';
 const card = 'rounded-xl border border-neutral-200 bg-white p-4 shadow-sm';
 const inp = 'rounded-lg border border-neutral-300 px-2 py-1 text-sm';
+const lbl = 'flex flex-col gap-1 text-xs font-medium text-neutral-600';
 
 type SortKey = 'price' | 'duration' | 'departure';
+type Mode = 'outbound' | 'return' | 'oneway';
 
-/** Compact Kayak-style comparison table; click a row to expand segment details. */
-function FlightTable({ items, canEdit, onShortlist, onReturns, sortBy, onSort }: {
-  items: Itin[]; canEdit: boolean; onShortlist: (it: Itin) => void;
-  onReturns?: (it: Itin) => void; sortBy: SortKey; onSort: (k: SortKey) => void;
+const airlineNames = (leg: Leg) =>
+  [...new Set(leg.segments.map((s) => s.airlineName || s.airlineCode))].join(', ');
+const stopsText = (leg: Leg) => (leg.stops === 0 ? 'Nonstop' : plural(leg.stops, 'stop'));
+
+function LegDetail({ leg, label }: { leg: Leg; label: string }) {
+  return (
+    <div className="mb-2 last:mb-0">
+      <p className="font-medium text-neutral-700">{label} · {dayLabel(leg.departLocal)}</p>
+      {leg.segments.map((s, i) => (
+        <div key={i}>
+          <p>
+            {t(s.departLocal)} {s.from.code} → {t(s.arriveLocal)} {s.to.code} · {s.airlineName} {s.airlineCode} {s.flightNumber}
+            {s.aircraft && ` · ${s.aircraft}`}
+          </p>
+          {leg.layovers[i] && (
+            <p className="pl-3 text-neutral-500">
+              Layover in {leg.layovers[i].airportName ?? leg.layovers[i].airportCode} · {fmtMin(leg.layovers[i].durationMin)}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Kayak-style comparison table; click a row to expand segment details. */
+function FlightTable({
+  items, mode, canEdit, travelers, isShortlisted, isPending, onShortlist, onChooseReturn, sortBy, onSort, testId,
+}: {
+  items: Itin[]; mode: Mode; canEdit: boolean; travelers: number;
+  isShortlisted: (key: string) => boolean; isPending: (key: string) => boolean;
+  onShortlist: (it: Itin) => void; onChooseReturn?: (it: Itin) => void;
+  sortBy: SortKey; onSort: (k: SortKey) => void; testId: string;
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const th = (label: string, k?: SortKey, right = false) => (
     <th className={`whitespace-nowrap px-3 py-2 font-medium ${right ? 'text-right' : 'text-left'}`}>
       {k ? (
-        <button type="button" onClick={() => onSort(k)} className="hover:text-teal-700">
+        <button type="button" onClick={() => onSort(k)} className={`hover:text-teal-700 ${sortBy === k ? 'text-teal-700' : ''}`}>
           {label}{sortBy === k && ' ↑'}
         </button>
       ) : label}
     </th>
   );
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto" data-testid={testId}>
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-neutral-200 text-xs uppercase tracking-wide text-neutral-500">
-            {th('Flight')}{th('Depart → Arrive', 'departure')}{th('Duration', 'duration')}
-            {th('Stops')}{th('Price', 'price', true)}<th aria-label="actions" />
+            {th('Airline')}{th('Departs → Arrives', 'departure')}{th('Duration', 'duration')}{th('Stops')}
+            {th(mode === 'outbound' ? 'Round trip from' : mode === 'return' ? 'Round trip' : 'Price', 'price', true)}
+            <th><span className="sr-only">Actions</span></th>
           </tr>
         </thead>
         <tbody>
           {items.map((it) => {
-            const legs = [it.outbound, ...(it.return ? [it.return] : [])];
-            const segs = it.outbound.segments;
+            const leg = mode === 'return' && it.return ? it.return : it.outbound;
+            const key = flightKey(it);
+            const saved = isShortlisted(key);
             return [
               <tr
                 key={it.id}
                 onClick={() => setOpen(open === it.id ? null : it.id)}
                 className="cursor-pointer border-b border-neutral-100 align-top hover:bg-teal-50/50"
               >
-                <td className="px-3 py-2">
-                  <span className="font-medium">{it.outbound.airlines.join(', ')}</span>
+                <td className="px-3 py-2.5">
+                  <span className="font-medium">{airlineNames(leg)}</span>
                   {it.isBest && <span className="ml-1.5 rounded bg-teal-100 px-1 text-xs text-teal-700">Best</span>}
                   <span className="block text-xs text-neutral-500">
-                    {segs.map((s) => `${s.airlineCode} ${s.flightNumber}`).join(' · ')}
+                    {leg.segments.map((s) => `${s.airlineCode} ${s.flightNumber}`).join(' · ')}
                   </span>
                 </td>
-                <td className="whitespace-nowrap px-3 py-2">
-                  {legs.map((leg, i) => (
-                    <span key={i} className={`block ${i > 0 ? 'text-neutral-500' : ''}`}>
-                      {i > 0 && 'Back '}
-                      {leg.from.code} {t(leg.departLocal)} → {leg.to.code} {t(leg.arriveLocal)}
-                      {plusOne(leg.arriveLocal, leg.segments)}
+                <td className="whitespace-nowrap px-3 py-2.5">
+                  <span className="font-medium">
+                    {t(leg.departLocal)} → {t(leg.arriveLocal)}
+                    {plusOne(leg.arriveLocal, leg.segments) && (
+                      <sup className="ml-0.5 text-xs text-amber-700" title="Arrives the next day">+1</sup>
+                    )}
+                  </span>
+                  <span className="block text-xs text-neutral-500">{leg.from.code} → {leg.to.code}</span>
+                </td>
+                <td className="whitespace-nowrap px-3 py-2.5">{fmtMin(leg.durationMin)}</td>
+                <td className="px-3 py-2.5 text-xs">
+                  <span className={leg.stops === 0 ? 'font-medium text-teal-700' : 'text-neutral-700'}>{stopsText(leg)}</span>
+                  {leg.stops > 0 && (
+                    <span className="block text-neutral-500">
+                      {leg.layovers.map((l) => `${l.airportCode} ${fmtMin(l.durationMin)}`).join(', ')}
                     </span>
-                  ))}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2">
-                  {legs.map((leg, i) => (
-                    <span key={i} className={`block ${i > 0 ? 'text-neutral-500' : ''}`}>{fmtMin(leg.durationMin)}</span>
-                  ))}
-                </td>
-                <td className="px-3 py-2 text-xs">
-                  {legs.map((leg, i) => (
-                    <span key={i} className={`block ${i > 0 ? 'text-neutral-400' : 'text-neutral-600'}`}>{stopsLabel(leg)}</span>
-                  ))}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2 text-right">
-                  <span className="font-semibold">
-                    {it.price.total !== null ? `${it.price.isFrom ? 'from ' : ''}$${Math.round(it.price.total)}` : 'n/a'}
-                  </span>
-                  {it.price.perPerson !== null && (
-                    <span className="block text-xs text-neutral-500">${Math.round(it.price.perPerson)} pp</span>
                   )}
                 </td>
-                <td className="px-3 py-2">
-                  <span className="flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
-                    {canEdit && <button type="button" className={btn2} onClick={() => onShortlist(it)}>Shortlist</button>}
-                    {onReturns && <button type="button" className={btn2} onClick={() => onReturns(it)}>See return flights</button>}
+                <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                  <span className="text-base font-semibold">{money(it.price.total, it.price.currency)}</span>
+                  {travelers > 1 && it.price.perPerson !== null && (
+                    <span className="block text-xs text-neutral-500">{money(it.price.perPerson, it.price.currency)} / person</span>
+                  )}
+                </td>
+                <td className="px-3 py-2.5">
+                  <span className="flex items-center justify-end gap-1.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                    {onChooseReturn && (
+                      <button type="button" className={btnSm} onClick={() => onChooseReturn(it)}>Choose return</button>
+                    )}
+                    {canEdit && (saved ? (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-teal-50 px-2 py-1 text-xs font-medium text-teal-700">
+                        <Check aria-hidden className="h-3.5 w-3.5" /> Shortlisted
+                      </span>
+                    ) : (
+                      <button type="button" className={btn2} disabled={isPending(key)} onClick={() => onShortlist(it)}>
+                        {isPending(key) && <Loader2 aria-hidden className="h-3 w-3 animate-spin" />}Shortlist
+                      </button>
+                    ))}
                     {it.bookingUrl && (
-                      <a href={it.bookingUrl} target="_blank" rel="noopener noreferrer" className={btn2}>Book</a>
+                      <a href={it.bookingUrl} target="_blank" rel="noopener noreferrer" className={btn2} title="Open on Google Flights">
+                        Book <ExternalLink aria-hidden className="h-3 w-3" />
+                      </a>
                     )}
                   </span>
                 </td>
@@ -128,20 +167,8 @@ function FlightTable({ items, canEdit, onShortlist, onReturns, sortBy, onSort }:
               open === it.id && (
                 <tr key={`${it.id}-detail`} className="border-b border-neutral-200 bg-neutral-50">
                   <td colSpan={6} className="px-3 py-2 text-xs text-neutral-600">
-                    {legs.map((leg, li) => (
-                      <div key={li} className="mb-1 last:mb-0">
-                        {leg.segments.map((s, si) => (
-                          <p key={si}>
-                            {si === 0 && li > 0 && <span className="font-medium">Return · </span>}
-                            {s.airlineCode} {s.flightNumber} · {s.from.code} {t(s.departLocal)} → {s.to.code} {t(s.arriveLocal)}
-                            {s.aircraft && ` · ${s.aircraft}`}
-                          </p>
-                        ))}
-                        {leg.layovers.map((l, lix) => (
-                          <p key={`lay-${lix}`} className="text-neutral-500">Layover {l.airportCode} {fmtMin(l.durationMin)}</p>
-                        ))}
-                      </div>
-                    ))}
+                    <LegDetail leg={it.outbound} label="Outbound" />
+                    {it.return && <LegDetail leg={it.return} label="Return" />}
                   </td>
                 </tr>
               ),
@@ -154,28 +181,34 @@ function FlightTable({ items, canEdit, onShortlist, onReturns, sortBy, onSort }:
 }
 
 export function FlightsClient({
-  tripId, canEdit, strategySummary, hasKids, initialSearch, timePrefs, options,
+  tripId, canEdit, strategySummary, hasKids, travelers, initialSearch, timePrefs, options,
 }: {
-  tripId: string; canEdit: boolean; strategySummary: string; hasKids: boolean;
+  tripId: string; canEdit: boolean; strategySummary: string; hasKids: boolean; travelers: number;
   initialSearch: Search | null; timePrefs: { outboundDepart?: { start: string; end: string }; returnDepart?: { start: string; end: string }; timezone?: string };
-  options: Opt[];
+  options: ShortlistedOption[];
 }) {
   const router = useRouter();
   const [search, setSearch] = useState<Search | null>(initialSearch);
   const [pair, setPair] = useState<Pair | null>(null);
   const [list, setList] = useState<Itin[] | null>(null);
   const [listErr, setListErr] = useState<string | null>(null);
+  const [pinned, setPinned] = useState<Itin | null>(null);
   const [returns, setReturns] = useState<Itin[] | null>(null);
   const [filterStops, setFilterStops] = useState<number | 'any'>('any');
   const [airlines, setAirlines] = useState<Set<string>>(new Set());
   const [maxDur, setMaxDur] = useState(0);
-  const [sortBy, setSortBy] = useState<'price' | 'duration' | 'departure'>('price');
+  const [sortBy, setSortBy] = useState<SortKey>('price');
   const [adultsOnly, setAdultsOnly] = useState(false);
   const [showAllReturns, setShowAllReturns] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [mState, mAction] = useActionState<ActionState, FormData>(manualFlightAction, {});
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [stale, setStale] = useState(false);
+  const [pending, setPending] = useState<Set<string>>(new Set());
+  const [actionErr, setActionErr] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const resultsRef = useRef<HTMLElement>(null);
+  const seq = useRef(0);
+  const autoOpened = useRef<string | null>(null);
 
   const [seenSearchId, setSeenSearchId] = useState(initialSearch?.id);
   if (initialSearch?.id !== seenSearchId) {
@@ -199,15 +232,13 @@ export function FlightsClient({
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [running, search, router]);
 
-  const seq = useRef(0);
-
   async function openPair(p: Pair) {
     const my = ++seq.current;
-    setPair(p); setList(null); setReturns(null); setListErr(null);
+    setPair(p); setList(null); setReturns(null); setPinned(null); setListErr(null);
     try {
       const res = await fetch(`/api/trips/${tripId}/flights?depart=${p.depart}${p.back ? `&return=${p.back}` : ''}`);
       const data = await res.json();
-      if (my !== seq.current) return; // a newer pair click superseded this response
+      if (my !== seq.current) return; // a newer click superseded this response
       if (!res.ok) { setListErr(data.error?.message ?? 'Failed to load flights'); return; }
       setList(data.itineraries ?? []);
       setAirlines(new Set());
@@ -216,9 +247,10 @@ export function FlightsClient({
     }
   }
 
-  async function openReturns(it: Itin) {
+  async function chooseReturn(it: Itin) {
     const my = ++seq.current;
-    setReturns(null);
+    setPinned(it); setReturns(null); setListErr(null); setShowAllReturns(false);
+    resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     try {
       const res = await fetch(`/api/trips/${tripId}/flights/returns?depart=${pair!.depart}&return=${pair!.back}&outbound=${it.id}`);
       const data = await res.json();
@@ -231,19 +263,44 @@ export function FlightsClient({
   }
 
   async function shortlist(it: Itin) {
-    const fd = new FormData();
-    fd.set('tripId', tripId);
-    fd.set('itinerary', JSON.stringify(it));
-    await shortlistFlightAction(fd);
-    router.refresh();
+    const key = flightKey(it);
+    setPending((s) => new Set(s).add(key));
+    setActionErr(null);
+    try {
+      const fd = new FormData();
+      fd.set('tripId', tripId);
+      fd.set('itinerary', JSON.stringify(it));
+      await shortlistFlightAction(fd);
+    } catch {
+      setActionErr('Could not shortlist that flight — please try again.');
+    } finally {
+      setPending((s) => { const n = new Set(s); n.delete(key); return n; });
+    }
   }
 
   const pairs = search?.result?.pairs ?? [];
-  const prices = pairs.filter((p) => p.minTotal !== null).map((p) => p.minTotal!);
-  const lo = Math.min(...prices), hi = Math.max(...prices);
-  const cheapest3 = [...pairs].filter((p) => p.minTotal !== null).sort((a, b) => a.minTotal! - b.minTotal!).slice(0, 3);
+  const priced = pairs.filter((p) => p.minTotal !== null);
+  const lo = priced.length ? Math.min(...priced.map((p) => p.minTotal!)) : null;
+  const hi = priced.length ? Math.max(...priced.map((p) => p.minTotal!)) : null;
+  const varied = lo !== null && hi !== null && hi > lo;
+  const cheapest = priced.find((p) => p.minTotal === lo) ?? null;
+  const searchId = search?.id;
+  const scanDone = search?.status === 'done';
 
-  const visible = (list ?? []).filter(isWellFormedItin).filter((it) =>
+  // Land on results: open the cheapest date pair once per finished scan.
+  const autoOpen = useEffectEvent(() => {
+    if (!searchId || autoOpened.current === searchId || pair || !cheapest) return;
+    autoOpened.current = searchId;
+    void openPair(cheapest);
+  });
+  useEffect(() => { if (scanDone) autoOpen(); }, [scanDone, searchId]);
+
+  const shortlistedKeys = new Set(options.map((o) => o.externalId).filter((k): k is string => !!k));
+  const isShortlisted = (k: string) => shortlistedKeys.has(k);
+  const isPending = (k: string) => pending.has(k);
+
+  const wellFormed = (list ?? []).filter(isWellFormedItin);
+  const visible = wellFormed.filter((it) =>
     (filterStops === 'any' || it.outbound.stops <= filterStops) &&
     (airlines.size === 0 || it.outbound.airlines.some((a) => airlines.has(a))) &&
     (maxDur === 0 || it.outbound.durationMin <= maxDur),
@@ -251,7 +308,9 @@ export function FlightsClient({
     sortBy === 'price' ? (a.price.total ?? 1e15) - (b.price.total ?? 1e15)
     : sortBy === 'duration' ? a.outbound.durationMin - b.outbound.durationMin
     : a.outbound.departLocal.localeCompare(b.outbound.departLocal));
-  const allAirlines = [...new Set((list ?? []).filter(isWellFormedItin).flatMap((i) => i.outbound.airlines))];
+  const airlineName = new Map<string, string>();
+  for (const it of wellFormed) for (const s of it.outbound.segments) airlineName.set(s.airlineCode, s.airlineName || s.airlineCode);
+  const allAirlines = [...new Set(wellFormed.flatMap((i) => i.outbound.airlines))];
 
   const scanFailed = search && (search.status === 'failed' || pairs.some((p) => p.error && (p.error.kind === 'blocked' || p.error.kind === 'parse')));
 
@@ -261,47 +320,63 @@ export function FlightsClient({
       it.return.departLocal, it.return.fromTz ?? 'UTC',
       timePrefs.returnDepart, timePrefs.timezone ?? 'UTC', pair.back,
     );
-  const visibleReturns = (returns ?? []).filter(isWellFormedItin)
+  const wellFormedReturns = (returns ?? []).filter(isWellFormedItin);
+  const outsideCount = wellFormedReturns.filter((it) => !returnInWindow(it)).length;
+  const visibleReturns = wellFormedReturns
     .filter((it) => showAllReturns || returnInWindow(it))
     .sort((a, b) =>
       sortBy === 'price' ? (a.price.total ?? 1e15) - (b.price.total ?? 1e15)
-      : sortBy === 'duration'
-        ? a.outbound.durationMin + (a.return?.durationMin ?? 0) - (b.outbound.durationMin + (b.return?.durationMin ?? 0))
-        : (a.return?.departLocal ?? '').localeCompare(b.return?.departLocal ?? ''));
+      : sortBy === 'duration' ? (a.return?.durationMin ?? 0) - (b.return?.durationMin ?? 0)
+      : (a.return?.departLocal ?? '').localeCompare(b.return?.departLocal ?? ''));
+
+  const tableProps = {
+    canEdit, travelers, isShortlisted, isPending, onShortlist: shortlist, sortBy, onSort: setSortBy,
+  };
 
   return (
     <div className="flex flex-col gap-6">
       <section className={card}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm text-neutral-600">{strategySummary}</p>
-            {(timePrefs.outboundDepart || timePrefs.returnDepart) && (
-              <p className="text-xs text-amber-700">
-                Time windows apply. Departures after midnight airport time fall on the next day and aren&apos;t included.
-              </p>
-            )}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-neutral-800">{strategySummary}</p>
+            <p className="mt-0.5 text-xs text-neutral-500">
+              We price every date combination in your plan, then you compare flights side by side. Live Google Flights data.
+            </p>
           </div>
           {canEdit && (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               {hasKids && (
                 <label className="flex items-center gap-1.5 text-xs text-neutral-600">
                   <input type="checkbox" checked={adultsOnly} onChange={(e) => setAdultsOnly(e.target.checked)} className="accent-teal-600" />
                   Price as adults only
                 </label>
               )}
-              <form onSubmit={async (e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); await startScanAction(fd); router.refresh(); }}>
+              <form action={async (fd) => {
+                setPair(null); setList(null); setPinned(null); setReturns(null);
+                await startScanAction(fd);
+                router.refresh();
+              }}>
                 <input type="hidden" name="tripId" value={tripId} />
                 <input type="hidden" name="adultsOnly" value={adultsOnly ? '1' : '0'} />
-                <button type="submit" className={btn}>Search flights</button>
+                <SubmitButton className={btn}>{pairs.length ? 'Refresh prices' : 'Search flights'}</SubmitButton>
               </form>
-              <button type="button" className={btn2} onClick={() => setManualOpen((v) => !v)}>Add manually</button>
+              <button type="button" className={btn2} onClick={() => setManualOpen((v) => !v)} aria-expanded={manualOpen}>
+                Add manually
+              </button>
             </div>
           )}
         </div>
+        {(timePrefs.outboundDepart || timePrefs.returnDepart) && (
+          <p className="mt-2 flex items-start gap-1.5 text-xs text-neutral-500">
+            <Clock aria-hidden className="mt-px h-3.5 w-3.5 shrink-0" />
+            Your departure-time windows filter the results. A departure after midnight (airport time) counts as the next day.
+          </p>
+        )}
         {running && (
-          <p className="mt-2 text-sm" role="status">
-            {search!.completed} / {search!.total} dates checked
-            <span className="ml-2 inline-block h-2 w-40 overflow-hidden rounded bg-neutral-200 align-middle">
+          <p className="mt-3 flex items-center gap-2 text-sm text-neutral-700" role="status">
+            <Loader2 aria-hidden className="h-4 w-4 animate-spin text-teal-600" />
+            Checking {search!.completed} of {plural(search!.total, 'date combination')}…
+            <span className="inline-block h-2 w-40 overflow-hidden rounded bg-neutral-200 align-middle">
               <span className="block h-full bg-teal-500" style={{ width: `${(search!.completed / Math.max(1, search!.total)) * 100}%` }} />
             </span>
           </p>
@@ -309,52 +384,70 @@ export function FlightsClient({
         {search?.status === 'failed' && <p className="mt-2 text-sm text-red-600">Scan failed ({search.error}). Try Search flights again.</p>}
         {scanFailed && <p className="mt-2 rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">Google Flights reading is temporarily failing; you can still add flights manually.</p>}
         {stale && <p className="mt-2 text-sm text-amber-700">This scan looks stalled — try Search flights again.</p>}
+        {!search && !running && (
+          <p className="mt-3 rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-600">
+            {canEdit ? 'Start with Search flights — it takes a few seconds per date combination.' : 'No flight search yet.'}
+          </p>
+        )}
       </section>
 
       {manualOpen && canEdit && (
         <section className={card}>
-          <h2 className="mb-2 font-semibold">Manual flight entry</h2>
-          <form action={mAction} className="flex flex-wrap items-end gap-2 text-sm">
+          <h2 className="font-semibold">Add a flight manually</h2>
+          <p className="mb-3 text-xs text-neutral-500">Booked elsewhere or not listed? Add it here and it joins the shortlist.</p>
+          <form action={mAction} className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
             <input type="hidden" name="tripId" value={tripId} />
-            <input name="airlineCode" placeholder="Airline (DL)" required maxLength={3} className={`${inp} w-20`} />
-            <input name="flightNumber" placeholder="Flight #" required className={`${inp} w-20`} />
-            <input name="from" placeholder="JFK" required maxLength={3} className={`${inp} w-20`} />
-            <input name="to" placeholder="LIS" required maxLength={3} className={`${inp} w-20`} />
-            <input name="departLocal" placeholder="2026-12-04T20:15" required className={`${inp} w-40`} />
-            <input name="arriveLocal" placeholder="2026-12-05T08:00" required className={`${inp} w-40`} />
-            <input name="returnDepartLocal" placeholder="Return departs (opt.)" className={`${inp} w-40`} />
-            <input name="returnArriveLocal" placeholder="Return arrives (opt.)" className={`${inp} w-40`} />
-            <input name="price" placeholder="Price" type="number" step="0.01" className={`${inp} w-24`} />
-            <input name="currency" placeholder="USD" defaultValue="USD" maxLength={3} className={`${inp} w-16`} />
-            <input name="bookingRef" placeholder="Conf. #" className={`${inp} w-24`} />
-            <button type="submit" className={btn}>Add</button>
-            {mState.error && <p role="alert" className="text-sm text-red-600">{mState.error}</p>}
+            <label className={lbl}>Airline code<input name="airlineCode" placeholder="DL" required maxLength={3} className={inp} /></label>
+            <label className={lbl}>Flight number<input name="flightNumber" placeholder="272" required className={inp} /></label>
+            <label className={lbl}>From airport<input name="from" placeholder="JFK" required maxLength={3} className={inp} /></label>
+            <label className={lbl}>To airport<input name="to" placeholder="LIS" required maxLength={3} className={inp} /></label>
+            <label className={lbl}>Departs<input name="departLocal" type="datetime-local" required className={inp} /></label>
+            <label className={lbl}>Arrives<input name="arriveLocal" type="datetime-local" required className={inp} /></label>
+            <label className={lbl}>Return departs (optional)<input name="returnDepartLocal" type="datetime-local" className={inp} /></label>
+            <label className={lbl}>Return arrives (optional)<input name="returnArriveLocal" type="datetime-local" className={inp} /></label>
+            <label className={lbl}>Total price<input name="price" type="number" step="0.01" min="0" className={inp} /></label>
+            <label className={lbl}>Currency<input name="currency" defaultValue="USD" maxLength={3} className={inp} /></label>
+            <label className={lbl}>Confirmation #<input name="bookingRef" className={inp} /></label>
+            <div className="flex items-end"><SubmitButton className={btn}>Add flight</SubmitButton></div>
+            {mState.error && <p role="alert" className="col-span-full text-sm text-red-600">{mState.error}</p>}
           </form>
         </section>
       )}
 
       {pairs.length > 0 && (
         <section className={card}>
-          <h2 className="mb-2 font-semibold">Date prices</h2>
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="font-semibold">Pick your dates</h2>
+            <p className="text-xs text-neutral-500">
+              Lowest round-trip price per date combination{travelers > 1 ? ` for ${plural(travelers, 'traveler')}` : ''}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {pairs.map((p) => {
-              const top = cheapest3.includes(p);
-              const color = p.minTotal === null
-                ? 'bg-neutral-50 text-neutral-400'
-                : `text-neutral-900 ${p.minTotal === lo ? 'bg-teal-200' : p.minTotal === hi ? 'bg-red-100' : 'bg-teal-50'}`;
+              const active = pair?.depart === p.depart && pair?.back === p.back;
+              const isLow = varied && p.minTotal === lo;
               return (
                 <button
                   key={`${p.depart}|${p.back}`}
                   type="button"
+                  aria-pressed={active}
                   onClick={() => openPair(p)}
-                  className={`rounded-lg border border-neutral-200 px-2 py-2 text-left text-xs hover:border-teal-500 ${color}`}
+                  className={`rounded-lg border px-3 py-2 text-left transition ${
+                    active ? 'border-teal-600 ring-2 ring-teal-600/25' : 'border-neutral-200 hover:border-teal-400'
+                  } ${isLow ? 'bg-teal-50' : p.status === 'error' ? 'bg-red-50' : 'bg-white'}`}
                 >
-                  <span className="block font-medium">{p.depart.slice(5)} → {p.back ? p.back.slice(5) : 'one-way'}</span>
-                  <span className="block">
-                    {p.status === 'pending' && '…'}
-                    {p.status === 'error' && 'error — retry'}
-                    {p.status === 'done' && (p.minTotal !== null ? `$${Math.round(p.minTotal)}` : p.verified === 'no_match' ? 'no flights match your return time' : 'n/a')}
-                    {top && ' · cheapest'}
+                  <span className="block text-xs font-medium text-neutral-600">
+                    {weekday(p.depart)} {shortDate(p.depart)} → {p.back ? `${weekday(p.back)} ${shortDate(p.back)}` : 'one-way'}
+                  </span>
+                  <span className="mt-0.5 block text-lg font-semibold leading-tight">
+                    {p.status === 'pending' ? <span className="text-sm font-normal text-neutral-400">Checking…</span>
+                      : p.status === 'error' ? <span className="text-sm font-normal text-red-700">Failed — retry</span>
+                      : p.minTotal !== null ? money(p.minTotal, p.currency ?? 'USD')
+                      : <span className="text-sm font-normal text-neutral-500">{p.verified === 'no_match' ? 'No return in your window' : 'No flights'}</span>}
+                  </span>
+                  <span className="block text-xs text-neutral-500">
+                    {p.back ? plural(nightsBetween(p.depart, p.back), 'night') : 'One way'}
+                    {isLow && <span className="font-medium text-teal-700"> · Cheapest</span>}
                   </span>
                 </button>
               );
@@ -364,53 +457,110 @@ export function FlightsClient({
       )}
 
       {pair && (
-        <section className={card}>
-          <div className="mb-3 flex flex-wrap items-center gap-3">
-            <h2 className="font-semibold">{pair.depart} → {pair.back ?? 'one-way'}</h2>
-            <label className="text-xs">Stops
-              <select className={`${inp} ml-1`} value={filterStops} onChange={(e) => setFilterStops(e.target.value === 'any' ? 'any' : Number(e.target.value))}>
-                <option value="any">any</option><option value="0">nonstop</option><option value="1">≤1</option><option value="2">≤2</option>
-              </select>
-            </label>
-            <label className="text-xs">Max duration
-              <select className={`${inp} ml-1`} value={maxDur} onChange={(e) => setMaxDur(Number(e.target.value))}>
-                <option value="0">any</option><option value="480">8h</option><option value="720">12h</option><option value="960">16h</option>
-              </select>
-            </label>
-            {allAirlines.length > 1 && (
-              <span className="flex gap-2 text-xs">
-                {allAirlines.map((a) => (
-                  <label key={a} className="flex items-center gap-1">
-                    <input type="checkbox" checked={airlines.has(a)} onChange={() => setAirlines((s) => { const n = new Set(s); if (n.has(a)) n.delete(a); else n.add(a); return n; })} className="accent-teal-600" />
-                    {a}
-                  </label>
-                ))}
-              </span>
-            )}
-          </div>
-          {listErr && <p role="alert" className="text-sm text-red-600">{listErr}</p>}
-          {!list && !listErr && <p className="text-sm text-neutral-500">Loading…</p>}
-          {list && visible.length > 0 && (
-            <FlightTable items={visible} canEdit={canEdit} onShortlist={shortlist}
-              onReturns={pair.back ? openReturns : undefined} sortBy={sortBy} onSort={setSortBy} />
-          )}
-          {list && visible.length === 0 && <p className="text-sm text-neutral-500">No flights match the filters.</p>}
-          {pair.back && (
-            <div className="mt-4">
-              {timePrefs.returnDepart && (
+        <section ref={resultsRef} className={`${card} scroll-mt-4`}>
+          {!pinned ? (
+            <>
+              <div className="mb-3">
+                <h2 className="font-semibold">
+                  {pair.back ? 'Choose your outbound flight' : 'Choose your flight'} · {dayLabel(pair.depart)}
+                </h2>
+                <p className="text-xs text-neutral-500">
+                  {pair.back
+                    ? `Step 1 of 2. Prices are the lowest round trip with each outbound — you'll pick the return (${dayLabel(pair.back)}) next.`
+                    : 'One-way prices.'}
+                  {pair.back && timePrefs.returnDepart && ' “From” prices assume the cheapest return at any hour; returns inside your time window can cost more — the date card shows the lowest price that fits.'}
+                </p>
+              </div>
+              <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-neutral-600">
+                <label className="flex items-center gap-1">Stops
+                  <select className={inp} value={filterStops} onChange={(e) => setFilterStops(e.target.value === 'any' ? 'any' : Number(e.target.value))}>
+                    <option value="any">Any</option><option value="0">Nonstop only</option><option value="1">1 stop or fewer</option><option value="2">2 stops or fewer</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-1">Max duration
+                  <select className={inp} value={maxDur} onChange={(e) => setMaxDur(Number(e.target.value))}>
+                    <option value="0">Any</option><option value="480">8h</option><option value="720">12h</option><option value="960">16h</option>
+                  </select>
+                </label>
+                {allAirlines.length > 1 && (
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <span>Airlines</span>
+                    {allAirlines.map((a) => (
+                      <button
+                        key={a} type="button" aria-pressed={airlines.has(a)}
+                        onClick={() => setAirlines((s) => { const n = new Set(s); if (n.has(a)) n.delete(a); else n.add(a); return n; })}
+                        className={`rounded-full border px-2 py-0.5 ${airlines.has(a) ? 'border-teal-600 bg-teal-50 text-teal-700' : 'border-neutral-300 hover:bg-neutral-100'}`}
+                      >
+                        {airlineName.get(a) ?? a}
+                      </button>
+                    ))}
+                  </span>
+                )}
+              </div>
+              {listErr && <p role="alert" className="text-sm text-red-600">{listErr}</p>}
+              {actionErr && <p role="alert" className="mb-2 text-sm text-red-600">{actionErr}</p>}
+              {!list && !listErr && (
+                <p className="flex items-center gap-2 text-sm text-neutral-500">
+                  <Loader2 aria-hidden className="h-4 w-4 animate-spin" />Loading…
+                </p>
+              )}
+              {list && visible.length > 0 && (
+                <FlightTable
+                  {...tableProps} items={visible} mode={pair.back ? 'outbound' : 'oneway'}
+                  onChooseReturn={pair.back ? chooseReturn : undefined} testId="outbound-table"
+                />
+              )}
+              {list && visible.length === 0 && (
+                <p className="text-sm text-neutral-500">
+                  {wellFormed.length === 0 ? 'No flights found for these dates.' : 'No flights match the filters — loosen them above.'}
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <h2 className="font-semibold">Choose your return · {dayLabel(pair.back!)}</h2>
+                  <p className="text-xs text-neutral-500">Step 2 of 2. Prices are the full round trip.</p>
+                </div>
+                <button type="button" className={btn2} onClick={() => { setPinned(null); setReturns(null); setListErr(null); }}>
+                  <ArrowLeft aria-hidden className="h-3.5 w-3.5" /> Change outbound
+                </button>
+              </div>
+              <div className="mb-3 rounded-lg border border-teal-200 bg-teal-50/50 px-3 py-2 text-sm">
+                <span className="text-xs font-medium uppercase tracking-wide text-teal-700">Your outbound</span>
+                <p>
+                  <span className="font-medium">{airlineNames(pinned.outbound)}</span>
+                  {' · '}{t(pinned.outbound.departLocal)} {pinned.outbound.from.code} → {t(pinned.outbound.arriveLocal)}
+                  {plusOne(pinned.outbound.arriveLocal, pinned.outbound.segments)} {pinned.outbound.to.code}
+                  {' · '}{fmtMin(pinned.outbound.durationMin)} · {stopsText(pinned.outbound)}
+                </p>
+              </div>
+              {timePrefs.returnDepart && outsideCount > 0 && (
                 <label className="mb-2 flex items-center gap-1.5 text-xs text-neutral-600">
                   <input type="checkbox" checked={showAllReturns} onChange={(e) => setShowAllReturns(e.target.checked)} className="accent-teal-600" />
                   Show returns outside your time window
+                  <span className="text-neutral-400">({outsideCount} {showAllReturns ? 'included' : 'hidden'})</span>
                 </label>
               )}
-              {visibleReturns.length > 0 && (
-                <FlightTable items={visibleReturns} canEdit={canEdit} onShortlist={shortlist}
-                  sortBy={sortBy} onSort={setSortBy} />
+              {listErr && <p role="alert" className="text-sm text-red-600">{listErr}</p>}
+              {actionErr && <p role="alert" className="mb-2 text-sm text-red-600">{actionErr}</p>}
+              {!returns && !listErr && (
+                <p className="flex items-center gap-2 text-sm text-neutral-500">
+                  <Loader2 aria-hidden className="h-4 w-4 animate-spin" />Loading return flights
+                </p>
+              )}
+              {returns && visibleReturns.length > 0 && (
+                <FlightTable {...tableProps} items={visibleReturns} mode="return" testId="returns-table" />
               )}
               {returns && visibleReturns.length === 0 && (
-                <p className="text-sm text-neutral-500">No return flights inside your time window — check the box above to see all.</p>
+                <p className="text-sm text-neutral-500">
+                  {wellFormedReturns.length === 0
+                    ? 'No return flights found for this outbound.'
+                    : 'No return flights inside your time window — check the box above to see all.'}
+                </p>
               )}
-            </div>
+            </>
           )}
         </section>
       )}

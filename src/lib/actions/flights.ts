@@ -2,9 +2,12 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { formFields } from '@/lib/form-data';
 import { requireTripRole } from '@/lib/auth/guards';
 import { startScan } from '@/lib/services/flights';
 import { addOption } from '@/lib/services/options';
+import { flightKey } from '@/lib/domain/flight-rows';
+import { dateRange, plural } from '@/lib/ui-format';
 import type { ActionState } from './people';
 
 export async function startScanAction(formData: FormData): Promise<void> {
@@ -15,23 +18,29 @@ export async function startScanAction(formData: FormData): Promise<void> {
   revalidatePath(`/trips/${tripId}/flights`);
 }
 
+type SegLite = { airlineCode: string; airlineName?: string; flightNumber: string };
+type LegLite = { from: { code: string }; to: { code: string }; departLocal: string; stops: number; segments: SegLite[] };
+
+const legSummary = (leg: LegLite) =>
+  `${leg.segments.map((s) => `${s.airlineCode} ${s.flightNumber}`).join(', ')} (${leg.stops === 0 ? 'nonstop' : plural(leg.stops, 'stop')})`;
+
 export async function shortlistFlightAction(formData: FormData): Promise<void> {
   const tripId = z.string().uuid().parse(formData.get('tripId'));
   const { user } = await requireTripRole(tripId, 'editor');
   const itinerary = JSON.parse(String(formData.get('itinerary')));
-  const dep = itinerary.outbound.departLocal.slice(0, 10);
-  const ret = itinerary.return?.departLocal?.slice(0, 10);
-  const title = `${itinerary.outbound.from.code}→${itinerary.outbound.to.code} ${itinerary.outbound.airlines.join('/')} ${dep}${ret ? ` → ${ret}` : ''}`;
+  const out = itinerary.outbound as LegLite;
+  const back = itinerary.return as LegLite | undefined;
+  const airlines = [...new Set(out.segments.map((s) => s.airlineName || s.airlineCode))].join(', ');
   await addOption(user, tripId, {
     kind: 'flight', source: 'google_flights',
-    externalId: `${itinerary.id}:${dep}:${ret ?? ''}`,
-    title,
-    subtitle: itinerary.outbound.segments.map((s: { airlineCode: string; flightNumber: string }) => `${s.airlineCode} ${s.flightNumber}`).join(', '),
+    externalId: flightKey(itinerary),
+    title: `${airlines} · ${out.from.code}→${out.to.code} · ${dateRange(out.departLocal.slice(0, 10), back?.departLocal.slice(0, 10))}`,
+    subtitle: back ? `Out ${legSummary(out)} · Back ${legSummary(back)}` : legSummary(out),
     data: itinerary,
     priceAmount: itinerary.price.total, priceCurrency: itinerary.price.currency,
     bookingUrl: itinerary.bookingUrl,
   });
-  revalidatePath(`/trips/${tripId}/flights`);
+  revalidatePath(`/trips/${tripId}`, 'layout');
 }
 
 export async function manualFlightAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -49,7 +58,7 @@ export async function manualFlightAction(_prev: ActionState, formData: FormData)
     currency: z.string().regex(/^[A-Z]{3}$/),
     bookingRef: z.string().max(40).optional(),
   });
-  const parsed = schema.safeParse(Object.fromEntries(formData));
+  const parsed = schema.safeParse(formFields(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid input' };
   const p = parsed.data;
   const { getAirport } = await import('@/lib/providers/airports');
@@ -99,10 +108,11 @@ export async function manualFlightAction(_prev: ActionState, formData: FormData)
   };
   await addOption(user, tripId, {
     kind: 'flight', source: 'manual', externalId: itinerary.id,
-    title: `Manual: ${seg.from.code}→${seg.to.code} ${seg.airlineCode} ${p.flightNumber} ${p.departLocal.slice(0, 10)}${hasReturn ? ` → ${p.returnDepartLocal!.slice(0, 10)}` : ''}`,
+    title: `${seg.airlineCode} ${p.flightNumber} · ${seg.from.code}→${seg.to.code} · ${dateRange(p.departLocal.slice(0, 10), hasReturn ? p.returnDepartLocal!.slice(0, 10) : null)}`,
+    subtitle: hasReturn ? 'Round trip · added manually' : 'One way · added manually',
     data: itinerary, priceAmount: p.price ?? null, priceCurrency: p.currency,
     bookingRef: p.bookingRef ?? null,
   });
-  revalidatePath(`/trips/${tripId}/flights`);
+  revalidatePath(`/trips/${tripId}`, 'layout');
   return {};
 }

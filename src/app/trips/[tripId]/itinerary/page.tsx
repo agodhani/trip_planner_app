@@ -24,6 +24,7 @@ export default async function ItineraryPage({ params }: { params: Promise<{ trip
     <ItineraryClient
       tripId={tripId}
       canEdit={role !== 'viewer'}
+      currency={trip.currency}
       days={range?.days ?? []}
       items={items.map((i) => ({
         id: i.id, day: i.day, kind: i.kind, title: i.title,

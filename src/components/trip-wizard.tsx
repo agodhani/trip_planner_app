@@ -245,7 +245,7 @@ export function TripWizard({
     <select
       value={val}
       onChange={(e) => set(Number(e.target.value))}
-      className={inputCls}
+      className={`${inputCls} min-w-32`}
       aria-label={ariaLabel}
     >
       {Array.from({ length: max + 1 }, (_, i) => (

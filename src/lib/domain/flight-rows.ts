@@ -29,6 +29,11 @@ export function isWellFormedItin(it: unknown): boolean {
   return isWellFormedLeg(i?.outbound) && (i?.return === undefined || isWellFormedLeg(i.return));
 }
 
+/** Dedupe key for a shortlisted flight — shared by the action and the UI. */
+export function flightKey(it: { id: string; outbound: { departLocal: string }; return?: { departLocal?: string } }) {
+  return `${it.id}:${it.outbound.departLocal.slice(0, 10)}:${it.return?.departLocal?.slice(0, 10) ?? ''}`;
+}
+
 export function fmtMin(min: number) {
   return `${Math.floor(min / 60)}h ${min % 60}m`;
 }

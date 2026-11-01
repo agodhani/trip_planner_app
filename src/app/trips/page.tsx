@@ -5,6 +5,7 @@ import { requireUser } from '@/lib/auth/guards';
 import type { TripStatus } from '@/lib/db/schema';
 import { describeStrategy } from '@/lib/domain/dates/strategy';
 import { listTripsForUser, type TripWithRole } from '@/lib/services/trips';
+import { dateRange } from '@/lib/ui-format';
 
 const STATUS_ORDER: TripStatus[] = [
   'in_progress',
@@ -38,7 +39,9 @@ function TripCard({ trip, role }: TripWithRole) {
         {trip.origin.city} → {trip.destination.city}
       </p>
       <p className="mt-1 text-xs text-neutral-500">
-        {describeStrategy(trip.dateStrategy, trip.timePrefs)}
+        {trip.startDate
+          ? <span className="font-medium text-neutral-700">{dateRange(trip.startDate, trip.endDate)}</span>
+          : describeStrategy(trip.dateStrategy, trip.timePrefs)}
       </p>
     </Link>
   );
@@ -62,8 +65,17 @@ export default async function TripsPage() {
           </Link>
         </div>
         {all.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-neutral-300 bg-white p-10 text-center text-neutral-500">
-            No trips yet. Create your first trip to get started.
+          <div className="rounded-xl border border-dashed border-neutral-300 bg-white p-10 text-center">
+            <p className="font-medium text-neutral-800">No trips yet</p>
+            <p className="mt-1 text-sm text-neutral-500">
+              Tell us where and roughly when — we&apos;ll find flights, stays, and things to do, then help you build the days.
+            </p>
+            <Link
+              href="/trips/new"
+              className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
+            >
+              <Plus className="h-4 w-4" /> Plan your first trip
+            </Link>
           </div>
         ) : (
           STATUS_ORDER.map((status) => {

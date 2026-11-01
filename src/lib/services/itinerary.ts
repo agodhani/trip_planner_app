@@ -4,8 +4,9 @@ import { db } from '@/lib/db/client';
 import { itineraryItems, transportLegs, tripOptions } from '@/lib/db/schema';
 import { todayISO } from '@/lib/clock';
 import { candidatePairs } from '@/lib/domain/dates/strategy';
-import { autoAssign, dayList } from '@/lib/domain/itinerary';
+import { autoAssign, dayList, to24h } from '@/lib/domain/itinerary';
 import { env } from '@/lib/env';
+import { dayLabel } from '@/lib/ui-format';
 import { assertTripRole, NotFoundError } from './access';
 import { recordEvent, type Tx } from './events';
 import { getTrip } from './trips';
@@ -47,27 +48,32 @@ type AnchorInsert = {
   anchorKey: string;
 };
 
+type AnchorLeg = {
+  departLocal?: string; arriveLocal?: string; from?: { code?: string }; to?: { code?: string };
+  segments?: { airlineCode?: string; flightNumber?: string }[];
+};
+
 function flightAnchors(trip: TripRow, opt: typeof tripOptions.$inferSelect): AnchorInsert[] {
-  const d = opt.data as {
-    outbound?: { departLocal?: string; arriveLocal?: string; from?: { code?: string }; to?: { code?: string } };
-    return?: { departLocal?: string; arriveLocal?: string; from?: { code?: string }; to?: { code?: string } };
-  };
+  const d = opt.data as { outbound?: AnchorLeg; return?: AnchorLeg };
   const out: AnchorInsert[] = [];
-  const push = (kind: AnchorInsert['kind'], leg: typeof d.outbound, key: string, dir: string) => {
+  const push = (kind: AnchorInsert['kind'], leg: AnchorLeg | undefined, key: string) => {
     const local = kind === 'flight_depart' ? leg?.departLocal : leg?.arriveLocal;
     if (!leg || !local) return;
-    const place = kind === 'flight_depart' ? leg.from?.code : leg.to?.code;
+    const seg = kind === 'flight_depart' ? leg.segments?.[0] : leg.segments?.at(-1);
+    const num = seg?.airlineCode && seg.flightNumber ? ` · ${seg.airlineCode} ${seg.flightNumber}` : '';
     out.push({
       kind, day: local.slice(0, 10), time: local.slice(11, 16),
-      title: `${kind === 'flight_depart' ? 'Fly out' : 'Arrive'} ${dir}${place ? ` · ${place}` : ''}`,
+      title: kind === 'flight_depart'
+        ? `Depart ${leg.from?.code ?? ''} → ${leg.to?.code ?? ''}${num}`
+        : `Land in ${leg.to?.code ?? ''}${num}`,
       optionId: opt.id, anchorKey: key,
     });
   };
-  push('flight_depart', d.outbound, `fl:${opt.id}:out:d`, 'outbound');
-  push('flight_arrive', d.outbound, `fl:${opt.id}:out:a`, 'outbound');
+  push('flight_depart', d.outbound, `fl:${opt.id}:out:d`);
+  push('flight_arrive', d.outbound, `fl:${opt.id}:out:a`);
   if (d.return) {
-    push('flight_depart', d.return, `fl:${opt.id}:ret:d`, 'back');
-    push('flight_arrive', d.return, `fl:${opt.id}:ret:a`, 'back');
+    push('flight_depart', d.return, `fl:${opt.id}:ret:d`);
+    push('flight_arrive', d.return, `fl:${opt.id}:ret:a`);
   }
   return out;
 }
@@ -75,11 +81,12 @@ function flightAnchors(trip: TripRow, opt: typeof tripOptions.$inferSelect): Anc
 function stayAnchors(trip: TripRow, opt: typeof tripOptions.$inferSelect): AnchorInsert[] {
   const d = opt.data as { checkIn?: string; checkOut?: string; checkInTime?: string; checkOutTime?: string };
   const out: AnchorInsert[] = [];
+  const at = { optionId: opt.id, lat: opt.lat ?? undefined, lon: opt.lon ?? undefined };
   if (d.checkIn) {
-    out.push({ kind: 'checkin', day: d.checkIn, time: d.checkInTime?.replace(/\s*(AM|PM)/i, '').trim(), title: `Check in · ${opt.title}`, optionId: opt.id, lat: opt.lat ?? undefined, lon: opt.lon ?? undefined, anchorKey: `st:${opt.id}:in` });
+    out.push({ ...at, kind: 'checkin', day: d.checkIn, time: to24h(d.checkInTime), title: `Check in · ${opt.title}`, anchorKey: `st:${opt.id}:in` });
   }
   if (d.checkOut) {
-    out.push({ kind: 'checkout', day: d.checkOut, time: d.checkOutTime?.replace(/\s*(AM|PM)/i, '').trim(), title: `Check out · ${opt.title}`, optionId: opt.id, lat: opt.lat ?? undefined, lon: opt.lon ?? undefined, anchorKey: `st:${opt.id}:out` });
+    out.push({ ...at, kind: 'checkout', day: d.checkOut, time: to24h(d.checkOutTime), title: `Check out · ${opt.title}`, anchorKey: `st:${opt.id}:out` });
   }
   return out;
 }
@@ -167,7 +174,7 @@ export async function addItem(
     }).returning();
     await recordEvent(tx, {
       tripId, userId: user.id, verb: 'itinerary.item_added',
-      summary: `${user.name} added ${input.title}${input.day ? ` on ${input.day}` : ' to the pool'}`,
+      summary: `${user.name} added ${input.title}${input.day ? ` on ${dayLabel(input.day)}` : ' as unscheduled'}`,
       entityType: 'itinerary_item', entityId: row.id,
     });
     return row;
@@ -192,7 +199,7 @@ export async function moveItem(
     }).where(eq(itineraryItems.id, itemId));
     await recordEvent(tx, {
       tripId, userId: user.id, verb: 'itinerary.item_moved',
-      summary: `${user.name} moved ${cur[0].title}${unplanned ? ' to the pool' : ` to ${target.day}`}`,
+      summary: `${user.name} moved ${cur[0].title}${unplanned ? ' to unscheduled' : ` to ${dayLabel(target.day!)}`}`,
       entityType: 'itinerary_item', entityId: itemId,
     });
   });

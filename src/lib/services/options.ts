@@ -37,6 +37,8 @@ export async function addOption(
 ) {
   await assertTripRole(tripId, user.id, 'editor');
   return db.transaction(async (tx) => {
+    // Idempotent: re-shortlisting the same result (double-click, two members
+    // at once) returns the existing row instead of a unique violation.
     const [row] = await tx.insert(tripOptions).values({
       tripId, kind: input.kind, source: input.source,
       externalId: input.externalId ?? null, title: input.title,
@@ -46,7 +48,14 @@ export async function addOption(
       lat: input.lat ?? null, lon: input.lon ?? null,
       bookingRef: input.bookingRef ?? null, bookingUrl: input.bookingUrl ?? null,
       createdBy: user.id,
-    }).returning();
+    }).onConflictDoNothing().returning();
+    if (!row) {
+      const [existing] = await tx.select().from(tripOptions).where(and(
+        eq(tripOptions.tripId, tripId), eq(tripOptions.kind, input.kind),
+        eq(tripOptions.source, input.source), eq(tripOptions.externalId, input.externalId ?? ''),
+      )).limit(1);
+      return existing;
+    }
     await recordEvent(tx, {
       tripId, userId: user.id, verb: 'option.added',
       summary: `${user.name} shortlisted ${input.title}`,
@@ -68,16 +77,17 @@ export async function setOptionStatus(
     const opt = await tx.select().from(tripOptions)
       .where(and(eq(tripOptions.id, optionId), eq(tripOptions.tripId, tripId))).limit(1);
     if (!opt[0]) throw new NotFoundError('Option not found');
-    if (status === 'selected') {
+    // One flight and one stay per trip; activities/transport can stack.
+    if (status === 'selected' && (opt[0].kind === 'flight' || opt[0].kind === 'lodging')) {
       await tx.update(tripOptions).set({ status: 'shortlisted' })
         .where(and(eq(tripOptions.tripId, tripId), eq(tripOptions.kind, opt[0].kind), eq(tripOptions.status, 'selected'), ne(tripOptions.id, optionId)));
-      // Selected flight anchors the trip dates.
-      if (opt[0].kind === 'flight') {
-        const data = opt[0].data as { outbound?: { departLocal: string }; return?: { arriveLocal: string } };
-        const start = data.outbound?.departLocal?.slice(0, 10) ?? null;
-        const end = (data.return?.arriveLocal ?? data.outbound?.departLocal)?.slice(0, 10) ?? null;
-        await tx.update(trips).set({ startDate: start, endDate: end }).where(eq(trips.id, tripId));
-      }
+    }
+    // Selected flight anchors the trip dates.
+    if (status === 'selected' && opt[0].kind === 'flight') {
+      const data = opt[0].data as { outbound?: { departLocal: string }; return?: { arriveLocal: string } };
+      const start = data.outbound?.departLocal?.slice(0, 10) ?? null;
+      const end = (data.return?.arriveLocal ?? data.outbound?.departLocal)?.slice(0, 10) ?? null;
+      await tx.update(trips).set({ startDate: start, endDate: end }).where(eq(trips.id, tripId));
     }
     await tx.update(tripOptions)
       .set({ status, bookingRef: bookingRef ?? opt[0].bookingRef, updatedAt: new Date() })
@@ -152,7 +162,7 @@ export async function listOptionComments(optionIds: string[]) {
 export type OptionPanelItem = {
   id: string; title: string; subtitle: string | null; status: string;
   price: number | null; currency: string | null; bookingUrl: string | null;
-  bookingRef: string | null; source: string;
+  bookingRef: string | null; source: string; externalId: string | null;
   votes: { score: number; voters: { name: string; value: number }[] };
   comments: { id: string; body: string; author: string }[];
 };
@@ -166,6 +176,7 @@ export async function optionPanel(tripId: string, kind: string): Promise<OptionP
     id: o.id, title: o.title, subtitle: o.subtitle, status: o.status,
     price: o.priceAmount ? Number(o.priceAmount) : null, currency: o.priceCurrency,
     bookingUrl: o.bookingUrl, bookingRef: o.bookingRef, source: o.source,
+    externalId: o.externalId,
     votes: votes.get(o.id) ?? { score: 0, voters: [] },
     comments: commentRows
       .filter((c) => c.optionId === o.id)

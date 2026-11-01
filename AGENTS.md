@@ -78,6 +78,25 @@ npm run smoke:flights     # live Google Flights reader check: npm run smoke:flig
 - E2E uses `tests/fixtures` replay (never network) and a truncated
   `tripplanner_test` DB; record fixtures with `npm run fixtures:record`.
 
+## UI conventions
+
+- Display money/dates through `src/lib/ui-format.ts` (`money`, `dayLabel`,
+  `dateRange`, `plural`) — never raw ISO dates or `USD 12` strings in UI.
+- Form submits use `SubmitButton` (spinner + disabled while pending, stable
+  label). Server Actions parse with `formFields(formData)` so a blank
+  optional input means "absent", not `0`.
+- Result lists are comparison tables: sortable headers, click a row to
+  expand details, horizontal row actions, and a persistent "Shortlisted"
+  state derived from option `externalId` (shared key, e.g. `flightKey`).
+  `addOption` is idempotent on that key.
+- Option mutations revalidate the whole trip layout
+  (`revalidatePath(`/trips/${id}`, 'layout')`): tab badges and the Overview
+  checklist (`tripProgress`) depend on them.
+- Order itinerary items with `orderDay()` everywhere they are listed or
+  paired (itinerary, routes, log) so all views agree.
+- Explain non-obvious numbers inline (scores, "from" prices, estimates)
+  rather than in tooltips only.
+
 ## Testing convention (user requirement)
 
 - **Every feature ships with tests.** New domain logic gets unit tests in

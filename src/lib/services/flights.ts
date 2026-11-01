@@ -9,6 +9,7 @@ import { passesWindow, windowForDate } from '@/lib/domain/dates/windows';
 import { env } from '@/lib/env';
 import { searchOutbounds, searchReturns } from '@/lib/providers/googleFlights';
 import type { FlightItinerary, FlightSearchRequest } from '@/lib/providers/types';
+import { dateRange, dayLabel, money } from '@/lib/ui-format';
 import { assertTripRole, NotFoundError } from './access';
 import { recordEvent } from './events';
 import { getTrip } from './trips';
@@ -173,7 +174,7 @@ async function runScan(searchId: string) {
     await recordEvent(tx, {
       tripId: req.tripId, userId: req.userId, verb: 'flights.scan_finished',
       summary: best?.minTotal
-        ? `Flight scan finished — cheapest ${best.minTotal} ${best.currency ?? ''} (${best.depart} → ${best.back ?? 'one-way'})`
+        ? `Flight scan finished — cheapest ${money(best.minTotal, best.currency ?? 'USD')} (${best.back ? dateRange(best.depart, best.back) : `${dayLabel(best.depart)}, one way`})`
         : 'Flight scan finished — no priced options found',
       entityType: 'flight_search', entityId: searchId,
     });

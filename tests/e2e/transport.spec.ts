@@ -5,32 +5,38 @@ test('transport: compute routes between items, choose leg, manual leg', async ({
   await signUp(page, 'E2E Rider', uniqueEmail('ride'));
   await createTripWeekendsInNov2026(page);
 
-  // Shortlist two located places (MAAT + Money Museum from the maps fixture).
+  // Shortlist two located places from the maps fixture.
   await page.getByRole('link', { name: 'Activities', exact: true }).click();
   await page.getByRole('button', { name: 'Museums' }).click();
   await expect(page.getByText(/of \d+ places/).first()).toBeVisible({ timeout: 30_000 });
-  await page.getByRole('button', { name: 'Shortlist' }).nth(0).click();
+  const shortlistBtns = page.getByRole('button', { name: 'Shortlist', exact: true });
+  await shortlistBtns.first().click();
   await expect(page.getByText('Shortlisted activities')).toBeVisible({ timeout: 15_000 });
-  await page.getByRole('button', { name: 'Shortlist' }).nth(1).click();
+  await expect(page.getByText('Shortlisted', { exact: true })).toHaveCount(1);
+  await shortlistBtns.first().click();
+  await expect(page.getByText('Shortlisted', { exact: true })).toHaveCount(2, { timeout: 15_000 });
 
-  // Put both on the first day via the itinerary pool.
+  // Itinerary: first one goes in Unscheduled, then onto day 1; second straight to day 1.
   await page.getByRole('link', { name: 'Itinerary', exact: true }).click();
   const pool = page.locator('section', { hasText: 'Shortlisted activities' });
   await expect(pool.locator('li')).toHaveCount(2, { timeout: 15_000 });
-  for (const i of [0, 1]) { void i;
-    const item = pool.locator('li').first();
-    await item.locator('select[name="day"]').selectOption({ index: 1 });
-    await item.getByRole('button', { name: 'Add' }).click();
-    await page.waitForTimeout(500);
-  }
+  await pool.locator('li').first().getByRole('button', { name: 'Add' }).click();
+  const unscheduled = page.locator('section', { has: page.getByRole('heading', { name: 'Unscheduled' }) });
+  await expect(unscheduled.getByLabel('Move to day')).toHaveCount(1, { timeout: 15_000 });
+  await unscheduled.getByLabel('Move to day').selectOption({ index: 1 });
+  await expect(unscheduled.getByText('Nothing unscheduled.')).toBeVisible({ timeout: 15_000 });
+  await expect(pool.locator('li')).toHaveCount(1);
+  await pool.locator('li').first().locator('select[name="day"]').selectOption({ index: 1 });
+  await pool.locator('li').first().getByRole('button', { name: 'Add' }).click();
+  await expect(page.getByText('Shortlisted activities')).toHaveCount(0, { timeout: 15_000 });
 
   // Compute routes → walk/drive/transit legs via OSRM/FOSSGIS/Transitous fixtures.
   await page.getByRole('link', { name: 'Getting around', exact: true }).click();
   await page.getByRole('button', { name: 'Compute routes' }).click();
   await expect(page.getByRole('heading', { name: /→/ })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText(/^walk/).first()).toBeVisible();
-  await expect(page.getByText(/^drive/).first()).toBeVisible();
-  await expect(page.getByText(/^transit/).first()).toBeVisible();
+  await expect(page.getByText(/^Walk/).first()).toBeVisible();
+  await expect(page.getByText(/^Drive/).first()).toBeVisible();
+  await expect(page.getByText(/^Transit/).first()).toBeVisible();
   await expect(page.getByText('chosen').first()).toBeVisible(); // walk ≤ 20 min auto-chosen
 
   // Pick a different leg.
@@ -42,6 +48,6 @@ test('transport: compute routes between items, choose leg, manual leg', async ({
   await page.getByPlaceholder('min').fill('30');
   await page.getByPlaceholder(/cost/).fill('45');
   await page.getByRole('button', { name: 'Add leg' }).click();
-  await expect(page.getByText('manual · Rental car')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('USD 45')).toBeVisible();
+  await expect(page.getByText('Rental car · $45.00')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('via added manually')).toBeVisible();
 });

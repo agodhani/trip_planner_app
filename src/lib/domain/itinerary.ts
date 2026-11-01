@@ -7,6 +7,39 @@ export function plusDays(iso: string, days: number): string {
     .slice(0, 10);
 }
 
+/** '3:00 PM' / '11 AM' / '15:00' → '15:00' / '11:00' / '15:00'; undefined if unparseable. */
+export function to24h(s: string | null | undefined): string | undefined {
+  const m = /^\s*(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?\s*$/i.exec(s ?? '');
+  if (!m) return undefined;
+  let h = Number(m[1]);
+  const min = Number(m[2] ?? 0);
+  const ap = m[3]?.toUpperCase();
+  if (ap === 'PM' && h < 12) h += 12;
+  if (ap === 'AM' && h === 12) h = 0;
+  if (h > 23 || min > 59) return undefined;
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+}
+
+type DayItem = { id: string; kind: string; startTime: string | null; sortOrder: number };
+
+/**
+ * Display/route order within one day: chronological by start time; untimed
+ * items sit around midday in the order added. Domain rules: you check out
+ * before your flight leaves and check in after you land.
+ */
+export function orderDay<T extends DayItem>(items: T[]): T[] {
+  const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const timesOf = (kind: string) => items.filter((i) => i.kind === kind && i.startTime).map((i) => mins(i.startTime!));
+  const departs = timesOf('flight_depart'), arrives = timesOf('flight_arrive');
+  const key = (i: T) => {
+    let m = i.startTime ? mins(i.startTime) : 12 * 60 + 0.5;
+    if (i.kind === 'checkout' && departs.length) m = Math.min(m, Math.min(...departs) - 0.25);
+    if (i.kind === 'checkin' && arrives.length) m = Math.max(m, Math.max(...arrives) + 0.25);
+    return m;
+  };
+  return [...items].sort((a, b) => key(a) - key(b) || a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
+}
+
 /** Inclusive day list start..end (capped). */
 export function dayList(start: string, end: string, maxDays = 45): string[] {
   const out: string[] = [];

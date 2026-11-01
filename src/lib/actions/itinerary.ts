@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { formFields } from '@/lib/form-data';
 import { requireTripRole } from '@/lib/auth/guards';
 import { NotFoundError } from '@/lib/services/access';
 import {
@@ -34,7 +35,7 @@ const itemSchema = z.object({
 export async function addItemAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const tripId = String(formData.get('tripId') ?? '');
   const { user } = await requireTripRole(tripId, 'editor');
-  const p = itemSchema.safeParse(Object.fromEntries(formData));
+  const p = itemSchema.safeParse(formFields(formData));
   if (!p.success) return { error: p.error.issues[0]?.message ?? 'Invalid input' };
   const d = p.data;
   await addItem(user, tripId, {
@@ -70,7 +71,8 @@ export async function updateItemAction(formData: FormData): Promise<void> {
   }
   if (formData.has('locked')) patch.locked = formData.get('locked') === '1';
   if (formData.has('plannedCost')) {
-    const v = Number(formData.get('plannedCost'));
+    const raw = String(formData.get('plannedCost') ?? '').trim();
+    const v = raw === '' ? NaN : Number(raw);
     patch.plannedCost = Number.isFinite(v) ? v : null;
     patch.plannedCurrency = String(formData.get('plannedCurrency') || 'USD');
   }
@@ -125,7 +127,7 @@ export async function manualLegAction(_prev: ActionState, formData: FormData): P
     durationMin: z.coerce.number().positive().optional(),
     cost: z.coerce.number().nonnegative().optional(),
   });
-  const p = schema.safeParse(Object.fromEntries(formData));
+  const p = schema.safeParse(formFields(formData));
   if (!p.success) return { error: p.error.issues[0]?.message ?? 'Invalid input' };
   await addManualLeg(user, tripId, {
     ...p.data, currency: String(formData.get('currency') || 'USD'),

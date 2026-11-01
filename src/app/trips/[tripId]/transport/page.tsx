@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation';
 import { requireTripRole } from '@/lib/auth/guards';
+import { orderDay } from '@/lib/domain/itinerary';
+import { listItems, tripDays } from '@/lib/services/itinerary';
 import { legsWithItems } from '@/lib/services/transport';
 import { getTrip } from '@/lib/services/trips';
 import { TransportClient } from '@/components/transport-client';
@@ -9,7 +11,8 @@ export default async function TransportPage({ params }: { params: Promise<{ trip
   const { role } = await requireTripRole(tripId, 'viewer');
   const trip = await getTrip(tripId);
   if (!trip) notFound();
-  const legs = await legsWithItems(tripId);
+  const [legs, items] = await Promise.all([legsWithItems(tripId), listItems(tripId)]);
+  const days = tripDays(trip)?.days ?? [];
 
   const groups = new Map<string, { fromTitle: string; toTitle: string; day: string | null; legs: typeof legs }>();
   for (const l of legs) {
@@ -22,11 +25,29 @@ export default async function TransportPage({ params }: { params: Promise<{ trip
     groups.set(key, g);
   }
 
+  // Manual legs can join any two consecutive scheduled items — no coordinates needed.
+  const byDay = new Map<string, typeof items>();
+  for (const i of items) {
+    if (!i.day || i.unplanned) continue;
+    byDay.set(i.day, [...(byDay.get(i.day) ?? []), i]);
+  }
+  const pairs: { fromItemId: string; toItemId: string; day: string; label: string }[] = [];
+  for (const [day, arr] of [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    const sorted = orderDay(arr);
+    for (let i = 0; i < sorted.length - 1; i++) {
+      pairs.push({
+        fromItemId: sorted[i].id, toItemId: sorted[i + 1].id, day,
+        label: `${sorted[i].title} → ${sorted[i + 1].title}`,
+      });
+    }
+  }
+
   return (
     <TransportClient
       tripId={tripId}
       canEdit={role !== 'viewer'}
       currency={trip.currency}
+      days={days}
       groups={[...groups.values()].map((g) => ({
         ...g,
         legs: g.legs.map((l) => ({
@@ -38,10 +59,7 @@ export default async function TransportPage({ params }: { params: Promise<{ trip
           fromItemId: l.leg.fromItemId, toItemId: l.leg.toItemId,
         })),
       }))}
-      pairs={[...groups.values()].map((g) => ({
-        fromItemId: g.legs[0].leg.fromItemId, toItemId: g.legs[0].leg.toItemId,
-        label: `${g.fromTitle} → ${g.toTitle}`,
-      }))}
+      pairs={pairs}
     />
   );
 }

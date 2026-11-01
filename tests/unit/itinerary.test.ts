@@ -1,5 +1,51 @@
 import { describe, expect, it } from 'vitest';
-import { autoAssign, dayList, plusDays } from '@/lib/domain/itinerary';
+import { autoAssign, dayList, orderDay, plusDays, to24h } from '@/lib/domain/itinerary';
+
+describe('to24h', () => {
+  it('converts provider check-in/out times to 24h', () => {
+    expect(to24h('3:00 PM')).toBe('15:00');
+    expect(to24h('11:00 AM')).toBe('11:00');
+    expect(to24h('12:00 PM')).toBe('12:00');
+    expect(to24h('12:30 AM')).toBe('00:30');
+    expect(to24h('11 am')).toBe('11:00');
+    expect(to24h('15:00')).toBe('15:00');
+  });
+  it('rejects garbage instead of storing a wrong time', () => {
+    expect(to24h('noon')).toBeUndefined();
+    expect(to24h('25:00')).toBeUndefined();
+    expect(to24h(undefined)).toBeUndefined();
+  });
+});
+
+describe('orderDay', () => {
+  const it_ = (id: string, kind: string, startTime: string | null, sortOrder = 10) => ({ id, kind, startTime, sortOrder });
+  const ids = (xs: { id: string }[]) => xs.map((x) => x.id);
+
+  it('orders by time, with untimed items around midday in the order added', () => {
+    expect(ids(orderDay([
+      it_('dinner', 'meal', '19:30', 10),
+      it_('museum', 'activity', null, 20),
+      it_('walk', 'activity', null, 30),
+      it_('breakfast', 'meal', '08:00:00', 40),
+    ]))).toEqual(['breakfast', 'museum', 'walk', 'dinner']);
+  });
+
+  it('lands before check-in even when check-in time is earlier', () => {
+    expect(ids(orderDay([
+      it_('in', 'checkin', '03:00'),
+      it_('land', 'flight_arrive', '09:05'),
+    ]))).toEqual(['land', 'in']);
+  });
+
+  it('checks out before an early flight even if the checkout deadline is later', () => {
+    expect(ids(orderDay([
+      it_('fly', 'flight_depart', '07:05', 0),
+      it_('coffee', 'meal', '06:30'),
+      it_('out', 'checkout', '11:30', 0),
+      it_('home', 'flight_arrive', '21:40', 90),
+    ]))).toEqual(['coffee', 'out', 'fly', 'home']);
+  });
+});
 
 describe('dayList/plusDays', () => {
   it('lists inclusive days', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  fmtMin, hhmm, isWellFormedItin, isWellFormedLeg, plusOne, stopsLabel,
+  flightKey, fmtMin, hhmm, isWellFormedItin, isWellFormedLeg, plusOne, stopsLabel,
 } from '@/lib/domain/flight-rows';
 
 const leg = {
@@ -30,6 +30,14 @@ describe('isWellFormedLeg/Itin', () => {
   });
   it('rejects an itinerary whose return leg is malformed', () => {
     expect(isWellFormedItin({ outbound: leg, return: { ...leg, segments: [] } })).toBe(false);
+  });
+});
+
+describe('flightKey', () => {
+  it('keys by itinerary id + outbound date + return date (blank when one-way/outbound-only)', () => {
+    expect(flightKey({ id: 'abc', outbound: leg })).toBe('abc:2026-12-04:');
+    expect(flightKey({ id: 'abc', outbound: leg, return: { departLocal: '2026-12-07T18:30' } }))
+      .toBe('abc:2026-12-04:2026-12-07');
   });
 });
 

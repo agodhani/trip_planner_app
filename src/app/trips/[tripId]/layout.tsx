@@ -3,7 +3,9 @@ import { LiveRefresh } from '@/components/live-refresh';
 import { TripTabs } from '@/components/trip-tabs';
 import { requireTripRole } from '@/lib/auth/guards';
 import { describeStrategy } from '@/lib/domain/dates/strategy';
+import { tripProgress } from '@/lib/services/progress';
 import { getTrip, listMemberUsers } from '@/lib/services/trips';
+import { dateRange, plural } from '@/lib/ui-format';
 import { notFound } from 'next/navigation';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -25,7 +27,9 @@ export default async function TripLayout({
   const { user } = await requireTripRole(tripId, 'viewer');
   const trip = await getTrip(tripId);
   if (!trip) notFound();
-  const members = await listMemberUsers(tripId);
+  const [members, progress] = await Promise.all([listMemberUsers(tripId), tripProgress(trip)]);
+  const state = Object.fromEntries(progress.steps.map((s) => [s.key, s.state]));
+  const travelers = trip.adults + trip.childrenAges.length;
 
   return (
     <>
@@ -51,12 +55,17 @@ export default async function TripLayout({
           </div>
           <p className="mt-1 text-sm text-neutral-600">
             {trip.origin.city} → {trip.destination.city} ·{' '}
-            {describeStrategy(trip.dateStrategy, trip.timePrefs)} ·{' '}
-            {trip.adults + trip.childrenAges.length} traveler
-            {trip.adults + trip.childrenAges.length === 1 ? '' : 's'}
+            {trip.startDate
+              ? <span className="font-medium text-neutral-800">{dateRange(trip.startDate, trip.endDate)}</span>
+              : describeStrategy(trip.dateStrategy, trip.timePrefs)}{' '}
+            · {plural(travelers, 'traveler')}
           </p>
           <div className="mt-3">
-            <TripTabs tripId={trip.id} />
+            <TripTabs
+              tripId={trip.id}
+              done={{ flights: state.flights === 'done', stay: state.stay === 'done' }}
+              shortlistCount={progress.shortlistCount}
+            />
           </div>
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { formFields } from '@/lib/form-data';
 import { requireTripRole } from '@/lib/auth/guards';
 import { NotFoundError } from '@/lib/services/access';
 import {
@@ -21,7 +22,7 @@ export async function addExpenseAction(_prev: ActionState, formData: FormData): 
     paidByTravelerId: z.string().uuid(),
     notes: z.string().max(500).optional(),
   });
-  const p = schema.safeParse(Object.fromEntries(formData));
+  const p = schema.safeParse(formFields(formData));
   if (!p.success) return { error: p.error.issues[0]?.message ?? 'Invalid input' };
   try {
     await addExpense(user, tripId, { ...p.data, notes: p.data.notes || null });
@@ -70,6 +71,5 @@ export async function tripStatusAction(formData: FormData): Promise<void> {
   const status = z.enum(['planning', 'booked', 'in_progress', 'completed', 'cancelled']).parse(formData.get('status'));
   const { user } = await requireTripRole(tripId, 'editor');
   await setTripStatus(user, tripId, status);
-  revalidatePath(`/trips/${tripId}/log`);
-  revalidatePath(`/trips/${tripId}`);
+  revalidatePath(`/trips/${tripId}`, 'layout'); // header status chip + trips list
 }

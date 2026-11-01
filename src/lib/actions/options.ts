@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { formFields } from '@/lib/form-data';
 import { requireTripRole } from '@/lib/auth/guards';
 import { NotFoundError } from '@/lib/services/access';
 import { addOption, deleteOption, setOptionStatus, vote } from '@/lib/services/options';
@@ -14,8 +15,11 @@ const sectionEnum = z.enum([
 ]);
 type Section = z.infer<typeof sectionEnum>;
 
+// Options feed the tab badges, overview progress, budget, and itinerary pool,
+// so refresh the whole trip layout rather than just the originating tab.
 function revalidate(tripId: string, section: Section) {
-  revalidatePath(`/trips/${tripId}/${section}`);
+  void section;
+  revalidatePath(`/trips/${tripId}`, 'layout');
 }
 
 const shortlistSchema = z.object({
@@ -37,7 +41,7 @@ export async function shortlistOptionAction(formData: FormData): Promise<ActionS
   const tripId = z.string().uuid().parse(formData.get('tripId'));
   const section = sectionEnum.parse(formData.get('section'));
   const { user } = await requireTripRole(tripId, 'editor');
-  const parsed = shortlistSchema.safeParse(Object.fromEntries(formData));
+  const parsed = shortlistSchema.safeParse(formFields(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid input' };
   const p = parsed.data;
   let data: unknown;

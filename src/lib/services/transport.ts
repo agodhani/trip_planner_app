@@ -2,6 +2,7 @@ import 'server-only';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { itineraryItems, transportLegs } from '@/lib/db/schema';
+import { orderDay } from '@/lib/domain/itinerary';
 import { routeEstimate } from '@/lib/providers/routing';
 import { planTransit } from '@/lib/providers/transitous';
 import { ProviderError } from '@/lib/providers/types';
@@ -32,7 +33,7 @@ export async function legPairs(tripId: string) {
   }
   const pairs: { from: typeof items[0]; to: typeof items[0] }[] = [];
   for (const arr of byDay.values()) {
-    const sorted = [...arr].sort((a, b) => a.sortOrder - b.sortOrder);
+    const sorted = orderDay(arr);
     for (let i = 0; i < sorted.length - 1; i++) {
       if (loc(sorted[i]) && loc(sorted[i + 1])) pairs.push({ from: sorted[i], to: sorted[i + 1] });
     }
