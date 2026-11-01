@@ -8,6 +8,7 @@ import {
 import { ShortlistedOptions } from '@/components/shortlisted-options';
 import type { ActionState } from '@/lib/actions/people';
 import { passesWindow } from '@/lib/domain/dates/windows';
+import { fmtMin, hhmm as t, isWellFormedItin, plusOne, stopsLabel } from '@/lib/domain/flight-rows';
 
 type Pair = {
   depart: string; back: string | null; status: 'pending' | 'done' | 'error';
@@ -43,22 +44,6 @@ const btn = 'rounded-lg bg-teal-600 px-3 py-1.5 text-sm font-medium text-white h
 const btn2 = 'rounded-md border border-neutral-300 px-2.5 py-1 text-xs text-neutral-700 hover:bg-neutral-100';
 const card = 'rounded-xl border border-neutral-200 bg-white p-4 shadow-sm';
 const inp = 'rounded-lg border border-neutral-300 px-2 py-1 text-sm';
-
-function fmtMin(min: number) {
-  return `${Math.floor(min / 60)}h ${min % 60}m`;
-}
-function t(local: string) {
-  return local.slice(11, 16);
-}
-function plusOne(local: string, segs: Leg['segments']) {
-  // +1 marker when arrival date differs from depart date.
-  return local.slice(0, 10) !== segs[0].departLocal.slice(0, 10) ? ' +1' : '';
-}
-function stopsLabel(leg: Leg) {
-  return leg.stops === 0
-    ? 'nonstop'
-    : `${leg.stops} stop${leg.stops > 1 ? 's' : ''} ${leg.layovers.map((l) => l.airportCode).join(', ')}`;
-}
 
 type SortKey = 'price' | 'duration' | 'departure';
 
@@ -214,21 +199,35 @@ export function FlightsClient({
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [running, search, router]);
 
+  const seq = useRef(0);
+
   async function openPair(p: Pair) {
+    const my = ++seq.current;
     setPair(p); setList(null); setReturns(null); setListErr(null);
-    const res = await fetch(`/api/trips/${tripId}/flights?depart=${p.depart}${p.back ? `&return=${p.back}` : ''}`);
-    const data = await res.json();
-    if (!res.ok) { setListErr(data.error?.message ?? 'Failed to load flights'); return; }
-    setList(data.itineraries);
-    setAirlines(new Set());
+    try {
+      const res = await fetch(`/api/trips/${tripId}/flights?depart=${p.depart}${p.back ? `&return=${p.back}` : ''}`);
+      const data = await res.json();
+      if (my !== seq.current) return; // a newer pair click superseded this response
+      if (!res.ok) { setListErr(data.error?.message ?? 'Failed to load flights'); return; }
+      setList(data.itineraries ?? []);
+      setAirlines(new Set());
+    } catch {
+      if (my === seq.current) setListErr('Request failed — check your connection and retry.');
+    }
   }
 
   async function openReturns(it: Itin) {
+    const my = ++seq.current;
     setReturns(null);
-    const res = await fetch(`/api/trips/${tripId}/flights/returns?depart=${pair!.depart}&return=${pair!.back}&outbound=${it.id}`);
-    const data = await res.json();
-    if (!res.ok) { setListErr(data.error?.message ?? 'Failed to load returns'); return; }
-    setReturns(data.itineraries);
+    try {
+      const res = await fetch(`/api/trips/${tripId}/flights/returns?depart=${pair!.depart}&return=${pair!.back}&outbound=${it.id}`);
+      const data = await res.json();
+      if (my !== seq.current) return;
+      if (!res.ok) { setListErr(data.error?.message ?? 'Failed to load returns'); return; }
+      setReturns(data.itineraries ?? []);
+    } catch {
+      if (my === seq.current) setListErr('Request failed — check your connection and retry.');
+    }
   }
 
   async function shortlist(it: Itin) {
@@ -244,7 +243,7 @@ export function FlightsClient({
   const lo = Math.min(...prices), hi = Math.max(...prices);
   const cheapest3 = [...pairs].filter((p) => p.minTotal !== null).sort((a, b) => a.minTotal! - b.minTotal!).slice(0, 3);
 
-  const visible = (list ?? []).filter((it) =>
+  const visible = (list ?? []).filter(isWellFormedItin).filter((it) =>
     (filterStops === 'any' || it.outbound.stops <= filterStops) &&
     (airlines.size === 0 || it.outbound.airlines.some((a) => airlines.has(a))) &&
     (maxDur === 0 || it.outbound.durationMin <= maxDur),
@@ -252,7 +251,7 @@ export function FlightsClient({
     sortBy === 'price' ? (a.price.total ?? 1e15) - (b.price.total ?? 1e15)
     : sortBy === 'duration' ? a.outbound.durationMin - b.outbound.durationMin
     : a.outbound.departLocal.localeCompare(b.outbound.departLocal));
-  const allAirlines = [...new Set((list ?? []).flatMap((i) => i.outbound.airlines))];
+  const allAirlines = [...new Set((list ?? []).filter(isWellFormedItin).flatMap((i) => i.outbound.airlines))];
 
   const scanFailed = search && (search.status === 'failed' || pairs.some((p) => p.error && (p.error.kind === 'blocked' || p.error.kind === 'parse')));
 
@@ -262,7 +261,8 @@ export function FlightsClient({
       it.return.departLocal, it.return.fromTz ?? 'UTC',
       timePrefs.returnDepart, timePrefs.timezone ?? 'UTC', pair.back,
     );
-  const visibleReturns = (returns ?? []).filter((it) => showAllReturns || returnInWindow(it))
+  const visibleReturns = (returns ?? []).filter(isWellFormedItin)
+    .filter((it) => showAllReturns || returnInWindow(it))
     .sort((a, b) =>
       sortBy === 'price' ? (a.price.total ?? 1e15) - (b.price.total ?? 1e15)
       : sortBy === 'duration'

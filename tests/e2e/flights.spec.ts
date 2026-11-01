@@ -45,3 +45,46 @@ test('flights: scan, pick pair, returns, shortlist, select, vote, manual', async
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(page.getByText('manual').first()).toBeVisible({ timeout: 15_000 });
 });
+
+test('flights: switch between date pairs, rapid clicks, error cell', async ({ page }) => {
+  await signUp(page, 'E2E Switcher', uniqueEmail('switch'));
+  await page.goto('/trips/new');
+  await pickPlace(page, 'From', 'new york', 'New York, US');
+  await pickPlace(page, 'To', 'lisbon', 'Lisbon, PT');
+  await page.getByRole('button', { name: 'Around a date' }).click();
+  await page.getByLabel('Around', { exact: true }).fill('2026-12-04');
+  await page.getByText('Return departs between').click();
+  await page.getByRole('button', { name: 'Create trip' }).click();
+  await expect(page).toHaveURL(/\/trips\/[0-9a-f-]{36}$/);
+  await page.getByRole('link', { name: 'Flights', exact: true }).click();
+  await page.getByRole('button', { name: 'Search flights' }).click();
+
+  const pricedCells = page.locator('button', { hasText: '$' });
+  await expect(pricedCells.first()).toBeVisible({ timeout: 60_000 });
+  expect(await pricedCells.count()).toBeGreaterThan(1);
+
+  // Switch between priced pairs — each must reload the results table.
+  for (const i of [0, 1, 0]) {
+    await pricedCells.nth(i).click();
+    await expect(page.getByText('Loading…')).toBeHidden({ timeout: 60_000 });
+    await expect(page.getByRole('button', { name: 'See return flights' }).first())
+      .toBeVisible({ timeout: 30_000 });
+  }
+
+  // Rapid switching — the last click must win, no stale rows or crash.
+  await pricedCells.nth(0).click();
+  await pricedCells.nth(1).click();
+  await expect(page.getByRole('button', { name: 'See return flights' }).first())
+    .toBeVisible({ timeout: 30_000 });
+
+  // A pair whose scan failed shows an error notice on click, not a crash.
+  const errCell = page.locator('button', { hasText: 'error — retry' }).first();
+  if (await errCell.count()) {
+    await errCell.click();
+    await expect(page.getByRole('alert')).toBeVisible({ timeout: 30_000 });
+    // …and switching back to a good pair recovers cleanly.
+    await pricedCells.nth(0).click();
+    await expect(page.getByRole('button', { name: 'See return flights' }).first())
+      .toBeVisible({ timeout: 30_000 });
+  }
+});
