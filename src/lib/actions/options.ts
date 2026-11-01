@@ -10,6 +10,7 @@ import type { ActionState } from './people';
 
 const sectionEnum = z.enum([
   'flights', 'stay', 'activities', 'transport', 'itinerary', 'budget', 'log',
+  'shortlist',
 ]);
 type Section = z.infer<typeof sectionEnum>;
 

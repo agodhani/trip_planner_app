@@ -27,4 +27,10 @@ test('stay: search, shortlist, select, manual entry', async ({ page }) => {
   await page.getByPlaceholder('Hotel or flat name').fill('E2E Pension');
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(page.getByText('manual').first()).toBeVisible({ timeout: 15_000 });
+
+  // The consolidated Shortlist tab aggregates every kind.
+  await page.getByRole('link', { name: 'Shortlist', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Stays' })).toBeVisible();
+  await expect(page.getByText('E2E Pension').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: /Stays \(\d+\)/ })).toBeVisible();
 });

@@ -10,6 +10,7 @@ const TABS = [
   { slug: 'activities', label: 'Activities' },
   { slug: 'transport', label: 'Getting around' },
   { slug: 'itinerary', label: 'Itinerary' },
+  { slug: 'shortlist', label: 'Shortlist' },
   { slug: 'budget', label: 'Budget' },
   { slug: 'log', label: 'Log' },
   { slug: 'people', label: 'People' },

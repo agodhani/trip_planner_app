@@ -30,6 +30,7 @@ test('every trip tab renders; travelers add + rename', async ({ page }) => {
     ['Stay', 'Search stays'],
     ['Activities', 'Museums'],
     ['Itinerary', /days · 2026-11/],
+    ['Shortlist', 'Nothing shortlisted yet'],
     ['Getting around', 'Compute routes'],
     ['Budget', 'Planned vs actual'],
     ['Log', 'What actually happened'],

@@ -36,7 +36,7 @@ export function ShortlistedOptions({
   tripId, section, title = 'Shortlisted', canEdit, options,
 }: {
   tripId: string;
-  section: 'flights' | 'stay' | 'activities' | 'transport' | 'itinerary' | 'budget' | 'log';
+  section: 'flights' | 'stay' | 'activities' | 'transport' | 'itinerary' | 'budget' | 'log' | 'shortlist';
   title?: string;
   canEdit: boolean;
   options: ShortlistedOption[];
