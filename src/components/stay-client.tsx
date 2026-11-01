@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useMemo, useState } from 'react';
 import { shortlistOptionAction } from '@/lib/actions/options';
 import type { ActionState } from '@/lib/actions/people';
-import { haversineKm, type GeoPoint } from '@/lib/domain/geo';
+import { haversineKm, kmLabel, type GeoPoint } from '@/lib/domain/geo';
 import { scoreLodgings, type Scored } from '@/lib/domain/stay';
 import type { LodgingResult } from '@/lib/providers/types';
 import { AMENITY_IDS, NON_HOSTEL_TYPE_IDS, PROPERTY_TYPES, HOTEL_RATING } from '@/lib/providers/serpapi/hotel-filters';
@@ -31,48 +31,99 @@ const AMENITY_CHOICES = [
   ['Beach access', AMENITY_IDS.beachAccess],
 ] as const;
 
-function LodgingCard({ l, canEdit, onShortlist }: { l: Scored<LodgingResult>; canEdit: boolean; onShortlist: () => void }) {
+type StaySort = 'score' | 'price' | 'rating';
+
+/** Compact comparison table; click a row to expand details. */
+function LodgingTable({ items, canEdit, onShortlist, nearPoint, sortBy, onSort }: {
+  items: Scored<LodgingResult>[]; canEdit: boolean; onShortlist: (l: LodgingResult) => void;
+  nearPoint: GeoPoint | null; sortBy: StaySort; onSort: (k: StaySort) => void;
+}) {
+  const [open, setOpen] = useState<string | null>(null);
+  const th = (label: string, k?: StaySort, right = false) => (
+    <th className={`whitespace-nowrap px-3 py-2 font-medium ${right ? 'text-right' : 'text-left'}`}>
+      {k ? (
+        <button type="button" onClick={() => onSort(k)} className="hover:text-teal-700">
+          {label}{sortBy === k && (k === 'score' || k === 'rating' ? ' ↓' : ' ↑')}
+        </button>
+      ) : label}
+    </th>
+  );
   return (
-    <div className={card}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex gap-3">
-          {l.images[0] && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={l.images[0]} alt="" className="h-20 w-28 rounded-lg object-cover" />
-          )}
-          <div>
-            <p className="font-medium">
-              {l.name}
-              {l.score >= 75 && <span className="ml-2 rounded bg-teal-100 px-1.5 text-xs text-teal-700">Recommended</span>}
-              {l.isHostel && <span className="ml-1 rounded bg-neutral-100 px-1.5 text-xs">hostel</span>}
-            </p>
-            <p className="text-xs text-neutral-500">
-              {l.hotelClass ? `${'★'.repeat(l.hotelClass)} · ` : ''}
-              {l.rating !== undefined ? `${l.rating} rating` : 'unrated'}
-              {l.reviews !== undefined ? ` (${l.reviews.toLocaleString()})` : ''}
-              {l.locationRating !== undefined ? ` · location ${l.locationRating}/5` : ''}
-            </p>
-            {l.description && <p className="mt-0.5 text-xs text-neutral-600">{l.description}</p>}
-            {l.reasons.length > 0 && <p className="mt-0.5 text-xs text-teal-700">{l.reasons.join(' · ')}</p>}
-            {l.nearbyPlaces.length > 0 && (
-              <p className="mt-0.5 text-xs text-neutral-500">Near {l.nearbyPlaces.slice(0, 2).join(', ')}</p>
-            )}
-            {l.amenities.length > 0 && (
-              <p className="mt-0.5 text-xs text-neutral-500">{l.amenities.slice(0, 6).join(' · ')}</p>
-            )}
-          </div>
-        </div>
-        <div className="shrink-0 text-right">
-          <p className="text-sm text-neutral-500">score {l.score}</p>
-          {l.pricePerNight !== undefined && <p className="font-semibold">{l.currency} {Math.round(l.pricePerNight)}/night</p>}
-          {l.totalPrice !== undefined && <p className="text-xs text-neutral-500">{l.currency} {Math.round(l.totalPrice)} total</p>}
-          {l.pricePerNight === undefined && <p className="text-xs text-neutral-500">price unavailable</p>}
-          <div className="mt-1 flex justify-end gap-1">
-            {canEdit && <button type="button" className={btn2} onClick={onShortlist}>Shortlist</button>}
-            {l.link && <a href={l.link} target="_blank" rel="noopener noreferrer" className={btn2}>Site</a>}
-          </div>
-        </div>
-      </div>
+    <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-neutral-200 text-xs uppercase tracking-wide text-neutral-500">
+            {th('Stay')}{th('Rating', 'rating')}{th('Score', 'score', true)}{th('Price', 'price', true)}
+            {nearPoint && th('Dist', undefined, true)}<th aria-label="actions" />
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((l) => {
+            const dist = nearPoint && l.lat !== undefined && l.lon !== undefined
+              ? haversineKm(nearPoint.lat, nearPoint.lon, l.lat, l.lon) : undefined;
+            return [
+              <tr
+                key={l.id}
+                onClick={() => setOpen(open === l.id ? null : l.id)}
+                className="cursor-pointer border-b border-neutral-100 align-top hover:bg-teal-50/50"
+              >
+                <td className="px-3 py-2">
+                  <span className="flex items-center gap-2">
+                    {l.images[0] && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={l.images[0]} alt="" className="h-10 w-14 shrink-0 rounded object-cover" />
+                    )}
+                    <span>
+                      <span className="font-medium">{l.name}</span>
+                      {l.score >= 75 && <span className="ml-1.5 rounded bg-teal-100 px-1 text-xs text-teal-700">Recommended</span>}
+                      <span className="block text-xs text-neutral-500">
+                        {l.hotelClass ? `${'★'.repeat(l.hotelClass)} ` : ''}
+                        {l.isHostel ? 'hostel' : l.kind === 'vacation_rental' ? 'rental' : 'hotel'}
+                      </span>
+                    </span>
+                  </span>
+                </td>
+                <td className="whitespace-nowrap px-3 py-2">
+                  {l.rating !== undefined
+                    ? <><span className="font-medium">{l.rating}</span>
+                        <span className="block text-xs text-neutral-500">{l.reviews?.toLocaleString() ?? 0} reviews</span></>
+                    : <span className="text-neutral-400">unrated</span>}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2 text-right">
+                  <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${l.score >= 75 ? 'bg-teal-100 text-teal-800' : 'bg-neutral-100 text-neutral-600'}`}>{l.score}</span>
+                </td>
+                <td className="whitespace-nowrap px-3 py-2 text-right">
+                  {l.pricePerNight !== undefined
+                    ? <><span className="font-semibold">{l.currency} {Math.round(l.pricePerNight)}</span><span className="text-xs text-neutral-500">/night</span></>
+                    : <span className="text-xs text-neutral-400">no price</span>}
+                  {l.totalPrice !== undefined && <span className="block text-xs text-neutral-500">{l.currency} {Math.round(l.totalPrice)} total</span>}
+                </td>
+                {nearPoint && <td className="whitespace-nowrap px-3 py-2 text-right text-xs text-neutral-600">{dist !== undefined ? kmLabel(dist) : '—'}</td>}
+                <td className="px-3 py-2">
+                  <span className="flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
+                    {canEdit && <button type="button" className={btn2} onClick={() => onShortlist(l)}>Shortlist</button>}
+                    {l.link && <a href={l.link} target="_blank" rel="noopener noreferrer" className={btn2}>Site</a>}
+                  </span>
+                </td>
+              </tr>,
+              open === l.id && (
+                <tr key={`${l.id}-detail`} className="border-b border-neutral-200 bg-neutral-50">
+                  <td colSpan={nearPoint ? 6 : 5} className="px-3 py-2 text-xs text-neutral-600">
+                    {l.description && <p>{l.description}</p>}
+                    {l.reasons.length > 0 && <p className="mt-0.5 text-teal-700">{l.reasons.join(' · ')}</p>}
+                    {l.locationRating !== undefined && <p className="mt-0.5">Location rating {l.locationRating}/5</p>}
+                    {l.nearbyPlaces.length > 0 && <p className="mt-0.5">Near {l.nearbyPlaces.slice(0, 3).join(', ')}</p>}
+                    {l.amenities.length > 0 && <p className="mt-0.5">{l.amenities.join(' · ')}</p>}
+                    {(l.checkInTime || l.checkOutTime) && (
+                      <p className="mt-0.5">Check-in {l.checkInTime ?? '—'} · check-out {l.checkOutTime ?? '—'}</p>
+                    )}
+                  </td>
+                </tr>
+              ),
+            ];
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -102,7 +153,7 @@ export function StayClient({
   const [nearKey, setNearKey] = useState('destination');
   const [pin, setPin] = useState<GeoPoint | null>(null);
   const [radiusKm, setRadiusKm] = useState(0);
-  const [sortBy, setSortBy] = useState<'score' | 'price' | 'rating' | 'reviews'>('score');
+  const [sortBy, setSortBy] = useState<StaySort>('score');
   const [showMap, setShowMap] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ kind: string; message: string } | null>(null);
@@ -194,8 +245,7 @@ export function StayClient({
     return [...filtered].sort((a, b) =>
       sortBy === 'score' ? b.score - a.score
       : sortBy === 'price' ? (a.pricePerNight ?? 1e15) - (b.pricePerNight ?? 1e15)
-      : sortBy === 'rating' ? (b.rating ?? -1) - (a.rating ?? -1)
-      : (b.reviews ?? -1) - (a.reviews ?? -1));
+      : (b.rating ?? -1) - (a.rating ?? -1));
   }, [results, radiusKm, nearPoint, sortBy]);
 
   const mapPoints: MapPoint[] = visible
@@ -267,12 +317,6 @@ export function StayClient({
               <option value="0">any distance</option><option value="2">2 km</option><option value="5">5 km</option><option value="10">10 km</option>
             </select>
           </label>
-          <label className="text-xs">Sort
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as never)} className={`${inp} ml-1`}>
-              <option value="score">recommended</option><option value="price">price</option>
-              <option value="rating">rating</option><option value="reviews">reviews</option>
-            </select>
-          </label>
           <button type="button" className={btn2} onClick={() => setShowMap((v) => !v)}>{showMap ? 'Hide map' : 'Map'}</button>
           <span className="flex-1" />
           {configured && <span className="text-xs text-neutral-500">{serpApi.searchesLeft ?? '–'} SerpApi searches left</span>}
@@ -318,7 +362,10 @@ export function StayClient({
             {visible.length} of {results.length} stay{results.length === 1 ? '' : 's'}
             {radiusKm > 0 && nearPoint ? ` within ${radiusKm} km` : ''}
           </p>
-          {visible.map((l) => <LodgingCard key={l.id} l={l} canEdit={canEdit} onShortlist={() => shortlist(l)} />)}
+          {visible.length > 0 && (
+            <LodgingTable items={visible} canEdit={canEdit} onShortlist={shortlist}
+              nearPoint={nearPoint} sortBy={sortBy} onSort={setSortBy} />
+          )}
           {visible.length === 0 && <p className="text-sm text-neutral-500">No stays match — widen the radius or filters.</p>}
           {ads.length > 0 && (
             <p className="mt-2 text-xs text-neutral-400">{ads.length} sponsored result{ads.length === 1 ? '' : 's'} hidden</p>

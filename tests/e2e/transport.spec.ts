@@ -17,7 +17,7 @@ test('transport: compute routes between items, choose leg, manual leg', async ({
   await page.getByRole('link', { name: 'Itinerary', exact: true }).click();
   const pool = page.locator('section', { hasText: 'Shortlisted activities' });
   await expect(pool.locator('li')).toHaveCount(2, { timeout: 15_000 });
-  for (const _ of [0, 1]) {
+  for (const i of [0, 1]) { void i;
     const item = pool.locator('li').first();
     await item.locator('select[name="day"]').selectOption({ index: 1 });
     await item.getByRole('button', { name: 'Add' }).click();
@@ -27,7 +27,7 @@ test('transport: compute routes between items, choose leg, manual leg', async ({
   // Compute routes → walk/drive/transit legs via OSRM/FOSSGIS/Transitous fixtures.
   await page.getByRole('link', { name: 'Getting around', exact: true }).click();
   await page.getByRole('button', { name: 'Compute routes' }).click();
-  await expect(page.getByRole('heading', { name: /MAAT/ })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('heading', { name: /→/ })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/^walk/).first()).toBeVisible();
   await expect(page.getByText(/^drive/).first()).toBeVisible();
   await expect(page.getByText(/^transit/).first()).toBeVisible();

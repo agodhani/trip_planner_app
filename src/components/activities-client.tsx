@@ -30,34 +30,84 @@ const CATEGORY_QUERY: Record<string, string> = {
   'Family-friendly': 'family friendly activities',
 };
 
-function PlaceCard({ p, canEdit, distanceKm, onShortlist }: {
-  p: PlaceResult; canEdit: boolean; distanceKm?: number; onShortlist: () => void;
+type PlaceSort = 'rating' | 'distance' | 'price';
+
+/** Compact comparison table; click a row to expand details. */
+function PlaceTable({ items, canEdit, onShortlist, nearPoint, sortBy, onSort }: {
+  items: { p: PlaceResult; dist?: number }[]; canEdit: boolean; onShortlist: (p: PlaceResult) => void;
+  nearPoint: GeoPoint | null; sortBy: PlaceSort; onSort: (k: PlaceSort) => void;
 }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const th = (label: string, k?: PlaceSort, right = false) => (
+    <th className={`whitespace-nowrap px-3 py-2 font-medium ${right ? 'text-right' : 'text-left'}`}>
+      {k ? (
+        <button type="button" onClick={() => onSort(k)} className="hover:text-teal-700">
+          {label}{sortBy === k && (k === 'rating' ? ' ↓' : ' ↑')}
+        </button>
+      ) : label}
+    </th>
+  );
   return (
-    <div className={card}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex gap-3">
-          {p.thumbnail && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={p.thumbnail} alt="" className="h-20 w-20 rounded-lg object-cover" />
-          )}
-          <div>
-            <p className="font-medium">{p.title}</p>
-            <p className="text-xs text-neutral-500">
-              {p.types.slice(0, 2).join(' · ')}
-              {p.rating !== undefined && ` · ${p.rating} (${p.reviews?.toLocaleString() ?? 0})`}
-              {p.priceLevel !== undefined && ` · ${'$'.repeat(Math.max(1, p.priceLevel))}`}
-              {distanceKm !== undefined && ` · ${kmLabel(distanceKm)} away`}
-            </p>
-            {p.address && <p className="mt-0.5 text-xs text-neutral-600">{p.address}</p>}
-            {p.description && <p className="mt-0.5 text-xs text-neutral-600">{p.description}</p>}
-          </div>
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          {canEdit && <button type="button" className={btn2} onClick={onShortlist}>Shortlist</button>}
-          {p.website && <a href={p.website} target="_blank" rel="noopener noreferrer" className={btn2}>Website</a>}
-        </div>
-      </div>
+    <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-neutral-200 text-xs uppercase tracking-wide text-neutral-500">
+            {th('Place')}{th('Rating', 'rating')}{th('Price', 'price')}
+            {nearPoint && th('Dist', 'distance', true)}<th aria-label="actions" />
+          </tr>
+        </thead>
+        <tbody>
+          {items.map(({ p, dist }) => [
+            <tr
+              key={p.id}
+              onClick={() => setOpen(open === p.id ? null : p.id)}
+              className="cursor-pointer border-b border-neutral-100 align-top hover:bg-teal-50/50"
+            >
+              <td className="px-3 py-2">
+                <span className="flex items-center gap-2">
+                  {p.thumbnail && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={p.thumbnail} alt="" className="h-10 w-10 shrink-0 rounded object-cover" />
+                  )}
+                  <span>
+                    <span className="font-medium">{p.title}</span>
+                    <span className="block text-xs text-neutral-500">{p.types.slice(0, 2).join(' · ')}</span>
+                  </span>
+                </span>
+              </td>
+              <td className="whitespace-nowrap px-3 py-2">
+                {p.rating !== undefined
+                  ? <><span className="font-medium">{p.rating}</span>
+                      <span className="block text-xs text-neutral-500">{p.reviews?.toLocaleString() ?? 0} reviews</span></>
+                  : <span className="text-neutral-400">unrated</span>}
+              </td>
+              <td className="whitespace-nowrap px-3 py-2 text-xs">
+                {p.priceLevel !== undefined ? '$'.repeat(Math.max(1, p.priceLevel)) : '—'}
+              </td>
+              {nearPoint && (
+                <td className="whitespace-nowrap px-3 py-2 text-right text-xs text-neutral-600">
+                  {dist !== undefined ? kmLabel(dist) : '—'}
+                </td>
+              )}
+              <td className="px-3 py-2">
+                <span className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                  {canEdit && <button type="button" className={btn2} onClick={() => onShortlist(p)}>Shortlist</button>}
+                  {p.website && <a href={p.website} target="_blank" rel="noopener noreferrer" className={btn2}>Site</a>}
+                </span>
+              </td>
+            </tr>,
+            open === p.id && (
+              <tr key={`${p.id}-detail`} className="border-b border-neutral-200 bg-neutral-50">
+                <td colSpan={nearPoint ? 5 : 4} className="px-3 py-2 text-xs text-neutral-600">
+                  {p.address && <p>{p.address}</p>}
+                  {p.description && <p className="mt-0.5">{p.description}</p>}
+                  {p.phone && <p className="mt-0.5">{p.phone}</p>}
+                </td>
+              </tr>
+            ),
+          ])}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -80,6 +130,7 @@ export function ActivitiesClient({
   const [minReviews, setMinReviews] = useState(0);
   const [maxPrice, setMaxPrice] = useState(0);
   const [radiusKm, setRadiusKm] = useState(0);
+  const [sortBy, setSortBy] = useState<PlaceSort>('rating');
   const [showMap, setShowMap] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ kind: string; message: string } | null>(null);
@@ -150,18 +201,26 @@ export function ActivitiesClient({
   }
 
   const visible = useMemo(() => {
-    const list = results ?? [];
-    return list.filter((p) =>
+    const list = (results ?? []).filter((p) =>
       (minRating === 0 || (p.rating ?? 0) >= minRating) &&
       (minReviews === 0 || (p.reviews ?? 0) >= minReviews) &&
       (maxPrice === 0 || p.priceLevel === undefined || p.priceLevel <= maxPrice) &&
       (radiusKm === 0 || !nearPoint || (p.lat !== undefined && p.lon !== undefined &&
         haversineKm(nearPoint.lat, nearPoint.lon, p.lat, p.lon) <= radiusKm)));
-  }, [results, minRating, minReviews, maxPrice, radiusKm, nearPoint]);
+    const withDist = list.map((p) => ({
+      p,
+      dist: nearPoint && p.lat !== undefined && p.lon !== undefined
+        ? haversineKm(nearPoint.lat, nearPoint.lon, p.lat, p.lon) : undefined,
+    }));
+    return withDist.sort((a, b) =>
+      sortBy === 'distance' ? (a.dist ?? 1e15) - (b.dist ?? 1e15)
+      : sortBy === 'price' ? (a.p.priceLevel ?? 1e15) - (b.p.priceLevel ?? 1e15)
+      : (b.p.rating ?? -1) - (a.p.rating ?? -1));
+  }, [results, minRating, minReviews, maxPrice, radiusKm, nearPoint, sortBy]);
 
   const mapPoints: MapPoint[] = visible
-    .filter((p) => p.lat !== undefined && p.lon !== undefined)
-    .map((p) => ({ id: p.id, lat: p.lat!, lon: p.lon!, title: p.title, subtitle: p.types[0], tone: 'default' }));
+    .filter(({ p }) => p.lat !== undefined && p.lon !== undefined)
+    .map(({ p }) => ({ id: p.id, lat: p.lat!, lon: p.lon!, title: p.title, subtitle: p.types[0], tone: 'default' }));
   if (nearPoint) mapPoints.unshift({ id: '__center', lat: nearPoint.lat, lon: nearPoint.lon, title: 'Search centre', tone: 'center' });
   if (pin) mapPoints.unshift({ id: '__pin', lat: pin.lat, lon: pin.lon, title: 'Dropped pin', tone: 'pin' });
 
@@ -260,13 +319,10 @@ export function ActivitiesClient({
       {results !== null && (
         <section className="flex flex-col gap-3">
           <p className="text-sm text-neutral-600">{visible.length} of {results.length} places</p>
-          {visible.map((p) => (
-            <PlaceCard
-              key={p.id} p={p} canEdit={canEdit} onShortlist={() => shortlist(p)}
-              distanceKm={nearPoint && p.lat !== undefined && p.lon !== undefined
-                ? haversineKm(nearPoint.lat, nearPoint.lon, p.lat, p.lon) : undefined}
-            />
-          ))}
+          {visible.length > 0 && (
+            <PlaceTable items={visible} canEdit={canEdit} onShortlist={shortlist}
+              nearPoint={nearPoint} sortBy={sortBy} onSort={setSortBy} />
+          )}
           {visible.length === 0 && <p className="text-sm text-neutral-500">No places match — loosen the filters.</p>}
         </section>
       )}

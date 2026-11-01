@@ -52,7 +52,11 @@ export function ShortlistedOptions({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-sm font-medium">{o.title}
-                  <span className="ml-2 rounded bg-neutral-100 px-1.5 text-xs">{o.status}</span>
+                  <span className={`ml-2 rounded px-1.5 text-xs ${
+                    o.status === 'selected' || o.status === 'booked'
+                      ? 'bg-teal-100 text-teal-800'
+                      : o.status === 'rejected' ? 'bg-red-50 text-red-600' : 'bg-neutral-100'
+                  }`}>{o.status}</span>
                   {o.source === 'manual' && <span className="ml-1 rounded bg-neutral-100 px-1.5 text-xs">manual</span>}
                 </p>
                 <p className="text-xs text-neutral-500">
