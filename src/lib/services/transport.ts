@@ -127,9 +127,18 @@ export async function addManualLeg(
   if (rows.length !== 2) throw new NotFoundError('Both items must exist on this trip');
   const [row] = await db.insert(transportLegs).values({
     tripId, fromItemId: input.fromItemId, toItemId: input.toItemId, mode: input.mode,
-    durationMin: input.durationMin ?? null, summary: input.summary, source: 'manual',
+    durationMin: input.durationMin ?? null, distanceM: null, summary: input.summary,
+    source: 'manual',
     details: input.cost != null ? { cost: input.cost, currency: input.currency } : null,
-    chosen: true,
+    deepLink: null, chosen: true,
+  }).onConflictDoUpdate({
+    target: [transportLegs.fromItemId, transportLegs.toItemId, transportLegs.mode],
+    set: {
+      durationMin: input.durationMin ?? null, distanceM: null, summary: input.summary,
+      source: 'manual',
+      details: input.cost != null ? { cost: input.cost, currency: input.currency } : null,
+      deepLink: null, computedAt: new Date(),
+    },
   }).returning();
   await db.transaction(async (tx) => {
     await tx.update(transportLegs).set({ chosen: false })

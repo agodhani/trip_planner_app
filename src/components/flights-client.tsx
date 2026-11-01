@@ -54,53 +54,116 @@ function plusOne(local: string, segs: Leg['segments']) {
   // +1 marker when arrival date differs from depart date.
   return local.slice(0, 10) !== segs[0].departLocal.slice(0, 10) ? ' +1' : '';
 }
+function stopsLabel(leg: Leg) {
+  return leg.stops === 0
+    ? 'nonstop'
+    : `${leg.stops} stop${leg.stops > 1 ? 's' : ''} ${leg.layovers.map((l) => l.airportCode).join(', ')}`;
+}
 
-function FlightCard({ it, onShortlist, canEdit, onReturns }: {
-  it: Itin; canEdit: boolean; onShortlist: () => void; onReturns?: () => void;
+type SortKey = 'price' | 'duration' | 'departure';
+
+/** Compact Kayak-style comparison table; click a row to expand segment details. */
+function FlightTable({ items, canEdit, onShortlist, onReturns, sortBy, onSort }: {
+  items: Itin[]; canEdit: boolean; onShortlist: (it: Itin) => void;
+  onReturns?: (it: Itin) => void; sortBy: SortKey; onSort: (k: SortKey) => void;
 }) {
-  const segs = it.outbound.segments;
+  const [open, setOpen] = useState<string | null>(null);
+  const th = (label: string, k?: SortKey, right = false) => (
+    <th className={`whitespace-nowrap px-3 py-2 font-medium ${right ? 'text-right' : 'text-left'}`}>
+      {k ? (
+        <button type="button" onClick={() => onSort(k)} className="hover:text-teal-700">
+          {label}{sortBy === k && ' ↑'}
+        </button>
+      ) : label}
+    </th>
+  );
   return (
-    <div className={card}>
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <p className="font-medium">
-            {it.outbound.airlines.join(', ')} ·{' '}
-            {segs.map((s) => `${s.airlineCode} ${s.flightNumber}`).join(' · ')}
-            {it.isBest && <span className="ml-2 rounded bg-teal-100 px-1.5 text-xs text-teal-700">Best</span>}
-          </p>
-          <p className="text-sm text-neutral-600">
-            {it.outbound.from.code} {t(it.outbound.departLocal)} → {it.outbound.to.code}{' '}
-            {t(it.outbound.arriveLocal)}{plusOne(it.outbound.arriveLocal, segs)} · {fmtMin(it.outbound.durationMin)}
-            {it.outbound.stops > 0
-              ? ` · ${it.outbound.stops} stop${it.outbound.stops > 1 ? 's' : ''} ${it.outbound.layovers.map((l) => `${l.airportCode} ${fmtMin(l.durationMin)}`).join(', ')}`
-              : ' · nonstop'}
-            {segs.some((s) => s.aircraft) && ` · ${segs.map((s) => s.aircraft).filter(Boolean).join(', ')}`}
-          </p>
-          {it.return && (
-            <p className="text-sm text-neutral-600">
-              Back {it.return.from.code} {t(it.return.departLocal)} → {it.return.to.code}{' '}
-              {t(it.return.arriveLocal)}{plusOne(it.return.arriveLocal, it.return.segments)}
-            </p>
-          )}
-        </div>
-        <div className="text-right">
-          <p className="font-semibold">
-            {it.price.total !== null ? `${it.price.isFrom ? 'from ' : ''}$${Math.round(it.price.total)}` : 'price unavailable'}
-          </p>
-          {it.price.perPerson !== null && (
-            <p className="text-xs text-neutral-500">${Math.round(it.price.perPerson)} per person</p>
-          )}
-          <div className="mt-1 flex justify-end gap-1">
-            {canEdit && <button type="button" className={btn2} onClick={onShortlist}>Shortlist</button>}
-            {onReturns && <button type="button" className={btn2} onClick={onReturns}>See return flights</button>}
-            {it.bookingUrl && (
-              <a href={it.bookingUrl} target="_blank" rel="noopener noreferrer" className={btn2}>
-                Book on Google Flights
-              </a>
-            )}
-          </div>
-        </div>
-      </div>
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-neutral-200 text-xs uppercase tracking-wide text-neutral-500">
+            {th('Flight')}{th('Depart → Arrive', 'departure')}{th('Duration', 'duration')}
+            {th('Stops')}{th('Price', 'price', true)}<th aria-label="actions" />
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((it) => {
+            const legs = [it.outbound, ...(it.return ? [it.return] : [])];
+            const segs = it.outbound.segments;
+            return [
+              <tr
+                key={it.id}
+                onClick={() => setOpen(open === it.id ? null : it.id)}
+                className="cursor-pointer border-b border-neutral-100 align-top hover:bg-teal-50/50"
+              >
+                <td className="px-3 py-2">
+                  <span className="font-medium">{it.outbound.airlines.join(', ')}</span>
+                  {it.isBest && <span className="ml-1.5 rounded bg-teal-100 px-1 text-xs text-teal-700">Best</span>}
+                  <span className="block text-xs text-neutral-500">
+                    {segs.map((s) => `${s.airlineCode} ${s.flightNumber}`).join(' · ')}
+                  </span>
+                </td>
+                <td className="whitespace-nowrap px-3 py-2">
+                  {legs.map((leg, i) => (
+                    <span key={i} className={`block ${i > 0 ? 'text-neutral-500' : ''}`}>
+                      {i > 0 && 'Back '}
+                      {leg.from.code} {t(leg.departLocal)} → {leg.to.code} {t(leg.arriveLocal)}
+                      {plusOne(leg.arriveLocal, leg.segments)}
+                    </span>
+                  ))}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2">
+                  {legs.map((leg, i) => (
+                    <span key={i} className={`block ${i > 0 ? 'text-neutral-500' : ''}`}>{fmtMin(leg.durationMin)}</span>
+                  ))}
+                </td>
+                <td className="px-3 py-2 text-xs">
+                  {legs.map((leg, i) => (
+                    <span key={i} className={`block ${i > 0 ? 'text-neutral-400' : 'text-neutral-600'}`}>{stopsLabel(leg)}</span>
+                  ))}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2 text-right">
+                  <span className="font-semibold">
+                    {it.price.total !== null ? `${it.price.isFrom ? 'from ' : ''}$${Math.round(it.price.total)}` : 'n/a'}
+                  </span>
+                  {it.price.perPerson !== null && (
+                    <span className="block text-xs text-neutral-500">${Math.round(it.price.perPerson)} pp</span>
+                  )}
+                </td>
+                <td className="px-3 py-2">
+                  <span className="flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
+                    {canEdit && <button type="button" className={btn2} onClick={() => onShortlist(it)}>Shortlist</button>}
+                    {onReturns && <button type="button" className={btn2} onClick={() => onReturns(it)}>See return flights</button>}
+                    {it.bookingUrl && (
+                      <a href={it.bookingUrl} target="_blank" rel="noopener noreferrer" className={btn2}>Book</a>
+                    )}
+                  </span>
+                </td>
+              </tr>,
+              open === it.id && (
+                <tr key={`${it.id}-detail`} className="border-b border-neutral-200 bg-neutral-50">
+                  <td colSpan={6} className="px-3 py-2 text-xs text-neutral-600">
+                    {legs.map((leg, li) => (
+                      <div key={li} className="mb-1 last:mb-0">
+                        {leg.segments.map((s, si) => (
+                          <p key={si}>
+                            {si === 0 && li > 0 && <span className="font-medium">Return · </span>}
+                            {s.airlineCode} {s.flightNumber} · {s.from.code} {t(s.departLocal)} → {s.to.code} {t(s.arriveLocal)}
+                            {s.aircraft && ` · ${s.aircraft}`}
+                          </p>
+                        ))}
+                        {leg.layovers.map((l, lix) => (
+                          <p key={`lay-${lix}`} className="text-neutral-500">Layover {l.airportCode} {fmtMin(l.durationMin)}</p>
+                        ))}
+                      </div>
+                    ))}
+                  </td>
+                </tr>
+              ),
+            ];
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -199,7 +262,12 @@ export function FlightsClient({
       it.return.departLocal, it.return.fromTz ?? 'UTC',
       timePrefs.returnDepart, timePrefs.timezone ?? 'UTC', pair.back,
     );
-  const visibleReturns = (returns ?? []).filter((it) => showAllReturns || returnInWindow(it));
+  const visibleReturns = (returns ?? []).filter((it) => showAllReturns || returnInWindow(it))
+    .sort((a, b) =>
+      sortBy === 'price' ? (a.price.total ?? 1e15) - (b.price.total ?? 1e15)
+      : sortBy === 'duration'
+        ? a.outbound.durationMin + (a.return?.durationMin ?? 0) - (b.outbound.durationMin + (b.return?.durationMin ?? 0))
+        : (a.return?.departLocal ?? '').localeCompare(b.return?.departLocal ?? ''));
 
   return (
     <div className="flex flex-col gap-6">
@@ -309,11 +377,6 @@ export function FlightsClient({
                 <option value="0">any</option><option value="480">8h</option><option value="720">12h</option><option value="960">16h</option>
               </select>
             </label>
-            <label className="text-xs">Sort
-              <select className={`${inp} ml-1`} value={sortBy} onChange={(e) => setSortBy(e.target.value as never)}>
-                <option value="price">price</option><option value="duration">duration</option><option value="departure">departure</option>
-              </select>
-            </label>
             {allAirlines.length > 1 && (
               <span className="flex gap-2 text-xs">
                 {allAirlines.map((a) => (
@@ -327,13 +390,11 @@ export function FlightsClient({
           </div>
           {listErr && <p role="alert" className="text-sm text-red-600">{listErr}</p>}
           {!list && !listErr && <p className="text-sm text-neutral-500">Loading…</p>}
-          <div className="flex flex-col gap-3">
-            {visible.map((it) => (
-              <FlightCard key={it.id} it={it} canEdit={canEdit} onShortlist={() => shortlist(it)}
-                onReturns={pair.back ? () => openReturns(it) : undefined} />
-            ))}
-            {list && visible.length === 0 && <p className="text-sm text-neutral-500">No flights match the filters.</p>}
-          </div>
+          {list && visible.length > 0 && (
+            <FlightTable items={visible} canEdit={canEdit} onShortlist={shortlist}
+              onReturns={pair.back ? openReturns : undefined} sortBy={sortBy} onSort={setSortBy} />
+          )}
+          {list && visible.length === 0 && <p className="text-sm text-neutral-500">No flights match the filters.</p>}
           {pair.back && (
             <div className="mt-4">
               {timePrefs.returnDepart && (
@@ -342,14 +403,13 @@ export function FlightsClient({
                   Show returns outside your time window
                 </label>
               )}
-              <div className="flex flex-col gap-3">
-                {visibleReturns.map((it) => (
-                  <FlightCard key={it.id} it={it} canEdit={canEdit} onShortlist={() => shortlist(it)} />
-                ))}
-                {returns && visibleReturns.length === 0 && (
-                  <p className="text-sm text-neutral-500">No return flights inside your time window — check the box above to see all.</p>
-                )}
-              </div>
+              {visibleReturns.length > 0 && (
+                <FlightTable items={visibleReturns} canEdit={canEdit} onShortlist={shortlist}
+                  sortBy={sortBy} onSort={setSortBy} />
+              )}
+              {returns && visibleReturns.length === 0 && (
+                <p className="text-sm text-neutral-500">No return flights inside your time window — check the box above to see all.</p>
+              )}
             </div>
           )}
         </section>

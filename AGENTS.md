@@ -77,3 +77,15 @@ npm run smoke:flights     # live Google Flights reader check: npm run smoke:flig
 - Invite links: 32-byte tokens, only the sha256 is stored; URL shown once.
 - E2E uses `tests/fixtures` replay (never network) and a truncated
   `tripplanner_test` DB; record fixtures with `npm run fixtures:record`.
+
+## Testing convention (user requirement)
+
+- **Every feature ships with tests.** New domain logic gets unit tests in
+  `tests/unit` (vitest); new user-facing flows get a Playwright spec in
+  `tests/e2e`. Bug fixes get a regression test that fails before the fix.
+- Keep the whole suite green when changing existing code — it is the
+  regression net. Before calling work done run: `npm run lint`,
+  `npm run typecheck`, `npm test`, `npm run build`, `npm run test:e2e`.
+- Provider-touching e2e paths need recorded fixtures under `tests/fixtures`
+  (`npm run fixtures:record`, or a `default.json` fallback per
+  provider/operation). Never hit the live network in tests.
