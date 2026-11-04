@@ -78,3 +78,23 @@ describe('autoAssign', () => {
     expect(total.length).toBeGreaterThan(0);
   });
 });
+
+describe('autoAssign with avoidDays', () => {
+  const twoDays = [
+    { day: 'd1', anchor: { lat: 0, lon: 0 }, capacity: 2 },
+    { day: 'd2', anchor: { lat: 10, lon: 10 }, capacity: 2 },
+  ];
+  it('an item near day 1 that avoids d1 goes to d2', () => {
+    const plan = autoAssign(twoDays, [
+      { id: 'a', lat: 0.1, lon: 0, avoidDays: ['d1'] },
+    ]);
+    expect(plan.get('d2')).toContain('a');
+    expect(plan.get('d1') ?? []).not.toContain('a');
+  });
+  it('an item avoiding every day is still placed', () => {
+    const plan = autoAssign(twoDays, [
+      { id: 'a', lat: 0.1, lon: 0, avoidDays: ['d1', 'd2'] },
+    ]);
+    expect([...plan.values()].flat()).toContain('a');
+  });
+});

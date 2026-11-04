@@ -1,9 +1,10 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { addExpenseAction, deleteExpenseAction } from '@/lib/actions/budget';
 import type { ActionState } from '@/lib/actions/people';
+import { weightedSplit } from '@/lib/domain/money';
 import type { BudgetSummary } from '@/lib/services/expenses';
 import { ui } from '@/components/shortlisted-options';
 import { SubmitButton } from '@/components/submit-button';
@@ -14,15 +15,76 @@ const lbl = 'flex flex-col gap-1 text-xs font-medium text-neutral-600';
 const CATS = ['flights', 'lodging', 'food', 'activities', 'transport', 'shopping', 'fees', 'other'];
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+type ExpenseRow = {
+  id: string; description: string; category: string; amount: number; currency: string;
+  amountBase: number; spentOn: string; payer: string;
+  splitMethod: 'equal' | 'exact' | 'shares';
+  shares: { travelerId: string; shares: number | null; exactAmount: number | null }[];
+};
+
 export function BudgetClient({ tripId, canEdit, summary, travelers, expenses, defaultDate, defaultPayerId }: {
   tripId: string; canEdit: boolean; summary: BudgetSummary;
   travelers: { id: string; name: string }[];
-  expenses: { id: string; description: string; category: string; amount: number; currency: string; amountBase: number; spentOn: string; payer: string }[];
+  expenses: ExpenseRow[];
   defaultDate: string; defaultPayerId: string;
 }) {
   const [eState, eAction] = useActionState<ActionState, FormData>(addExpenseAction, {});
   const cur = summary.currency;
   const m = (n: number) => money(n, cur, 2);
+  const nameOf = (id: string) => travelers.find((t) => t.id === id)?.name ?? '?';
+
+  // Controlled so React's post-action form reset can't drop them; we reset
+  // ourselves when the action reports success.
+  const [amount, setAmount] = useState('');
+  const [currencyInp, setCurrencyInp] = useState(cur);
+  const [splitMethod, setSplitMethod] = useState<'equal' | 'exact' | 'shares'>('equal');
+  // Track who's OUT so a traveler added mid-session defaults to included.
+  const [excluded, setExcluded] = useState<Set<string>>(() => new Set());
+  const [exact, setExact] = useState<Record<string, string>>({});
+  const [shareVals, setShareVals] = useState<Record<string, string>>({});
+  const [lastState, setLastState] = useState(eState);
+  if (eState !== lastState) {
+    setLastState(eState);
+    if (!eState.error) {
+      setAmount(''); setCurrencyInp(cur);
+      setSplitMethod('equal');
+      setExcluded(new Set());
+      setExact({}); setShareVals({});
+    }
+  }
+
+  const amountCents = Math.round(Number(amount) * 100);
+  const validAmount = amount.trim() !== '' && Number.isFinite(Number(amount)) && amountCents > 0;
+  const fmtCur = /^[A-Za-z]{3}$/.test(currencyInp.trim()) ? currencyInp.trim().toUpperCase() : cur;
+  const checkedIds = travelers.filter((t) => !excluded.has(t.id)).map((t) => t.id);
+  const exactSum = travelers.reduce((a, t) => a + Math.round(Number(exact[t.id] ?? '') * 100 || 0), 0);
+  const shareWeights = travelers.map((t) => {
+    const n = Number(shareVals[t.id] ?? '1');
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  });
+  const sharesPreview = (() => {
+    if (!validAmount || !shareWeights.some((w) => w > 0)) return null;
+    try {
+      return weightedSplit(amountCents, shareWeights);
+    } catch {
+      return null;
+    }
+  })();
+  const splitValid =
+    splitMethod === 'equal' ? checkedIds.length > 0
+    : splitMethod === 'exact' ? validAmount && exactSum === amountCents
+    : shareWeights.some((w) => w > 0);
+
+  const splitSummary = (e: ExpenseRow): string => {
+    if (e.splitMethod === 'exact') {
+      return `exact: ${e.shares.map((s) => `${nameOf(s.travelerId)} ${money(s.exactAmount ?? 0, e.currency, 2)}`).join(' · ')}`;
+    }
+    if (e.splitMethod === 'shares') {
+      return `shares: ${e.shares.map((s) => `${nameOf(s.travelerId)} ${s.shares ?? 0}`).join(' · ')}`;
+    }
+    if (e.shares.length === travelers.length) return 'split equally';
+    return `split equally: ${e.shares.map((s) => nameOf(s.travelerId)).join(', ')}`;
+  };
   const cats = [...new Set([
     ...Object.keys(summary.plannedByCategory), ...Object.keys(summary.estimateByCategory), ...Object.keys(summary.actualByCategory),
   ])];
@@ -128,13 +190,18 @@ export function BudgetClient({ tripId, canEdit, summary, travelers, expenses, de
 
       <section className={card}>
         <h2 className="font-semibold">Expenses</h2>
-        <p className="mb-3 text-xs text-neutral-500">Split equally among all travelers. Foreign currencies convert at the ECB rate for the spend date (Frankfurter).</p>
+        <p className="mb-3 text-xs text-neutral-500">
+          {travelers.length >= 2
+            ? 'Split each expense equally, by exact amounts, or by shares (e.g. 2 for a couple). '
+            : 'Split equally among all travelers. '}
+          Foreign currencies convert at the ECB rate for the spend date (Frankfurter).
+        </p>
         <ul className="flex flex-col text-sm">
           {expenses.map((e) => (
             <li key={e.id} className="flex items-center justify-between gap-3 border-b border-neutral-100 py-2">
               <span className="min-w-0">
                 <span className="font-medium">{e.description}</span>
-                <span className="block text-xs text-neutral-500">{cap(e.category)} · {dayLabel(e.spentOn)} · paid by {e.payer}</span>
+                <span className="block text-xs text-neutral-500">{cap(e.category)} · {dayLabel(e.spentOn)} · paid by {e.payer} · {splitSummary(e)}</span>
               </span>
               <span className="flex shrink-0 items-center gap-2 text-right">
                 <span>
@@ -162,16 +229,105 @@ export function BudgetClient({ tripId, canEdit, summary, travelers, expenses, de
               <select name="category" className={inp} defaultValue="food">{CATS.map((c) => <option key={c} value={c}>{cap(c)}</option>)}</select>
             </label>
             <label className={lbl}>Date<input name="spentOn" type="date" required defaultValue={defaultDate} className={inp} /></label>
-            <label className={lbl}>Amount<input name="amount" placeholder="0.00" type="number" step="0.01" min="0.01" required className={inp} /></label>
-            <label className={lbl}>Currency<input name="currency" defaultValue={cur} maxLength={3} className={`${inp} uppercase`} /></label>
+            <label className={lbl}>Amount<input name="amount" placeholder="0.00" type="number" step="0.01" min="0.01" required
+              value={amount} onChange={(e) => setAmount(e.target.value)} className={inp} /></label>
+            <label className={lbl}>Currency<input name="currency" value={currencyInp} maxLength={3}
+              onChange={(e) => setCurrencyInp(e.target.value.toUpperCase())} className={`${inp} uppercase`} /></label>
             <label className={lbl}>Paid by
               <select name="paidByTravelerId" className={inp} defaultValue={defaultPayerId}>
                 {travelers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </label>
             <label className={lbl}>Notes<input name="notes" placeholder="optional" className={inp} /></label>
+            {travelers.length >= 2 && (
+              <div className="col-span-full flex flex-col gap-2 rounded-lg bg-neutral-50 px-3 py-2">
+                <input type="hidden" name="splitMethod" value={splitMethod} />
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-medium text-neutral-600">Split</span>
+                  {([['equal', 'Equally'], ['exact', 'Exact amounts'], ['shares', 'By shares']] as const).map(([k, label]) => (
+                    <button
+                      key={k} type="button" aria-pressed={splitMethod === k} onClick={() => setSplitMethod(k)}
+                      className={`rounded-full border px-2.5 py-0.5 text-xs ${splitMethod === k ? 'border-teal-600 bg-teal-50 text-teal-700' : 'border-neutral-300 text-neutral-600 hover:bg-neutral-100'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {splitMethod === 'equal' && (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    {travelers.map((t) => (
+                      <label key={t.id} className="flex items-center gap-1.5 text-xs text-neutral-700">
+                        <input
+                          type="checkbox" name="splitWith" value={t.id} checked={!excluded.has(t.id)}
+                          onChange={(e) => setExcluded((s) => {
+                            const n = new Set(s);
+                            if (e.target.checked) n.delete(t.id); else n.add(t.id);
+                            return n;
+                          })}
+                          className="accent-teal-600"
+                        />
+                        {t.name}
+                      </label>
+                    ))}
+                    {validAmount && checkedIds.length > 0 && (
+                      <span className="text-xs text-neutral-500">{money(amountCents / checkedIds.length / 100, fmtCur, 2)} each</span>
+                    )}
+                  </div>
+                )}
+                {splitMethod === 'exact' && (
+                  <div className="flex flex-col gap-1">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                      {travelers.map((t) => (
+                        <label key={t.id} className="flex items-center gap-1.5 text-xs text-neutral-700">
+                          {t.name}
+                          <input
+                            name={`exact:${t.id}`} type="number" step="0.01" min="0" aria-label={`${t.name}'s amount`}
+                            value={exact[t.id] ?? ''}
+                            onChange={(e) => setExact((s) => ({ ...s, [t.id]: e.target.value }))}
+                            className={`${inp} w-24`}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    {validAmount && (
+                      <p className="text-xs text-neutral-500">
+                        {exactSum === amountCents
+                          ? `Adds up to ${money(amountCents / 100, fmtCur, 2)}`
+                          : `Assigned ${money(exactSum / 100, fmtCur, 2)} of ${money(amountCents / 100, fmtCur, 2)} — ${money(Math.abs(amountCents - exactSum) / 100, fmtCur, 2)} ${exactSum < amountCents ? 'left' : 'over'}`}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {splitMethod === 'shares' && (
+                  <div className="flex flex-col gap-1">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                      {travelers.map((t) => (
+                        <label key={t.id} className="flex items-center gap-1.5 text-xs text-neutral-700">
+                          {t.name}
+                          <input
+                            name={`shares:${t.id}`} type="number" min="0" step="any" aria-label={`${t.name}'s shares`}
+                            value={shareVals[t.id] ?? '1'}
+                            onChange={(e) => setShareVals((s) => ({ ...s, [t.id]: e.target.value }))}
+                            className={`${inp} w-20`}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    {sharesPreview && (
+                      <p className="text-xs text-neutral-500">
+                        {travelers
+                          .map((t, i) => ({ name: t.name, cents: sharesPreview[i] }))
+                          .filter((p) => p.cents > 0)
+                          .map((p) => `${p.name} ${money(p.cents / 100, fmtCur, 2)}`)
+                          .join(' · ')}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="col-span-full flex items-center gap-3">
-              <SubmitButton className={btn}>Add expense</SubmitButton>
+              <SubmitButton className={btn} disabled={travelers.length >= 2 && !splitValid}>Add expense</SubmitButton>
               {eState.error && <p role="alert" className="text-sm text-red-600">{eState.error}</p>}
             </div>
           </form>

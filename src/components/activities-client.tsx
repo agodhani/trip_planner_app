@@ -6,6 +6,7 @@ import { Check, ExternalLink, Loader2, Map as MapIcon, MapPin, Search, Star } fr
 import { shortlistOptionAction } from '@/lib/actions/options';
 import type { ActionState } from '@/lib/actions/people';
 import { haversineKm, kmLabel, type GeoPoint } from '@/lib/domain/geo';
+import { weekSummary } from '@/lib/domain/opening-hours';
 import type { PlaceResult } from '@/lib/providers/types';
 import { OptionMap, type MapPoint } from '@/components/option-map';
 import { HiddenIds, ShortlistedOptions, ui, type ShortlistedOption } from '@/components/shortlisted-options';
@@ -121,7 +122,8 @@ function PlaceTable({ items, canEdit, onShortlist, isShortlisted, isPending, nea
                   {p.address && <p>{p.address}</p>}
                   {p.description && <p className="mt-0.5">{p.description}</p>}
                   {p.phone && <p className="mt-0.5">{p.phone}</p>}
-                  {!p.address && !p.description && !p.phone && <p>No extra details from Google Maps.</p>}
+                  {weekSummary(p.hours) && <p className="mt-0.5">Hours: {weekSummary(p.hours)}</p>}
+                  {!p.address && !p.description && !p.phone && !weekSummary(p.hours) && <p>No extra details from Google Maps.</p>}
                 </td>
               </tr>
             ),

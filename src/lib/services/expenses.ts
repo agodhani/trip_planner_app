@@ -3,7 +3,7 @@ import { and, asc, desc, eq } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { expenses, expenseShares, itineraryItems, journalEntries, travelers, tripOptions, trips, users } from '@/lib/db/schema';
 import { fxRate } from '@/lib/providers/frankfurter';
-import { equalSplit, settleUp, toBaseCents, type Balance, type Transfer } from '@/lib/domain/money';
+import { planSplit, settleUp, toBaseCents, toCents, type Balance, type SplitInput, type Transfer } from '@/lib/domain/money';
 import { money } from '@/lib/ui-format';
 import { assertTripRole, NotFoundError } from './access';
 import { recordEvent } from './events';
@@ -18,17 +18,24 @@ export async function addExpense(
   input: {
     description: string; category: string; amount: number; currency: string;
     spentOn: string; paidByTravelerId: string;
-    splitTravelerIds?: string[]; notes?: string | null;
+    split?: SplitInput; notes?: string | null;
     optionId?: string | null; itineraryItemId?: string | null;
   },
 ) {
   await assertTripRole(tripId, user.id, 'editor');
   const trip = await getTrip(tripId);
   if (!trip) throw new NotFoundError();
+  const tvl = await listTravelers(tripId);
+  const memberIds = new Set(tvl.map((t) => t.id));
+  if (!memberIds.has(input.paidByTravelerId)) throw new Error('Payer is not a traveler on this trip');
+  const split = input.split ?? { method: 'equal' as const, travelerIds: tvl.map((t) => t.id) };
+  const splitIds = split.method === 'equal' ? split.travelerIds : split.parts.map((p) => p.travelerId);
+  if (splitIds.some((id) => !memberIds.has(id))) throw new Error('Split includes someone who is not on this trip');
   const rate = input.currency === trip.currency ? 1 : await fxRate(input.currency, trip.currency, input.spentOn);
+  const amountCents = toCents(input.amount);
   const baseCents = toBaseCents(input.amount, rate);
-  const shares = input.splitTravelerIds?.length ? input.splitTravelerIds : (await listTravelers(tripId)).map((t) => t.id);
-  const splits = equalSplit(baseCents, shares.length);
+  const planned = planSplit(split, amountCents, baseCents, input.currency);
+  if ('error' in planned) throw new Error(planned.error);
 
   return db.transaction(async (tx) => {
     const [row] = await tx.insert(expenses).values({
@@ -36,12 +43,16 @@ export async function addExpense(
       amount: String(input.amount), currency: input.currency,
       fxRate: String(rate), amountBase: String(baseCents / 100),
       spentOn: input.spentOn, paidByTravelerId: input.paidByTravelerId,
-      splitMethod: 'equal', optionId: input.optionId ?? null,
+      splitMethod: split.method, optionId: input.optionId ?? null,
       itineraryItemId: input.itineraryItemId ?? null,
       notes: input.notes ?? null, createdBy: user.id,
     }).returning();
     await tx.insert(expenseShares).values(
-      shares.map((travelerId, i) => ({ expenseId: row.id, travelerId, shareBase: String(splits[i] / 100) })),
+      planned.rows.map((r) => ({
+        expenseId: row.id, travelerId: r.travelerId, shareBase: String(r.shareBaseCents / 100),
+        shares: r.shares !== undefined ? String(r.shares) : null,
+        exactAmount: r.exactCents !== undefined ? String(r.exactCents / 100) : null,
+      })),
     );
     await recordEvent(tx, {
       tripId, userId: user.id, verb: 'expense.added',
@@ -68,16 +79,16 @@ export async function deleteExpense(user: { id: string; name: string }, tripId: 
 
 export async function listExpenses(tripId: string) {
   const rows = await db
-    .select({ expense: expenses, payer: travelers.displayName, shareTravelerId: expenseShares.travelerId, shareBase: expenseShares.shareBase })
+    .select({ expense: expenses, payer: travelers.displayName, shareTravelerId: expenseShares.travelerId, shareBase: expenseShares.shareBase, shares: expenseShares.shares, exactAmount: expenseShares.exactAmount })
     .from(expenses)
     .innerJoin(travelers, eq(expenses.paidByTravelerId, travelers.id))
     .leftJoin(expenseShares, eq(expenses.id, expenseShares.expenseId))
     .where(eq(expenses.tripId, tripId))
     .orderBy(desc(expenses.spentOn));
-  const byId = new Map<string, { expense: typeof expenses.$inferSelect; payer: string; shares: { travelerId: string; shareBase: string }[] }>();
+  const byId = new Map<string, { expense: typeof expenses.$inferSelect; payer: string; shares: { travelerId: string; shareBase: string; shares: string | null; exactAmount: string | null }[] }>();
   for (const r of rows) {
     const e = byId.get(r.expense.id) ?? { expense: r.expense, payer: r.payer, shares: [] };
-    if (r.shareTravelerId) e.shares.push({ travelerId: r.shareTravelerId, shareBase: r.shareBase! });
+    if (r.shareTravelerId) e.shares.push({ travelerId: r.shareTravelerId, shareBase: r.shareBase!, shares: r.shares, exactAmount: r.exactAmount });
     byId.set(r.expense.id, e);
   }
   return [...byId.values()];

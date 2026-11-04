@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  flightKey, fmtMin, hhmm, isWellFormedItin, isWellFormedLeg, plusOne, stopsLabel,
+  emissionsInfo, flightKey, fmtMin, hhmm, isWellFormedItin, isWellFormedLeg,
+  layoverFlags, legroomLabel, plusOne, stopsLabel,
 } from '@/lib/domain/flight-rows';
 
 const leg = {
@@ -56,5 +57,66 @@ describe('row format helpers', () => {
       ...leg, stops: 2,
       layovers: [{ airportCode: 'BOS', durationMin: 90 }, { airportCode: 'KEF', durationMin: 60 }],
     })).toBe('2 stops BOS, KEF');
+  });
+});
+
+describe('emissionsInfo', () => {
+  it('labels below / above / equal to typical', () => {
+    expect(emissionsInfo({ emissionsKg: 443, typicalEmissionsKg: 480 }))
+      .toEqual({ kg: 443, pct: -8, vsTypical: '8% below typical' });
+    expect(emissionsInfo({ emissionsKg: 500, typicalEmissionsKg: 450 }))
+      .toEqual({ kg: 500, pct: 11, vsTypical: '11% above typical' });
+    expect(emissionsInfo({ emissionsKg: 480, typicalEmissionsKg: 480 }))
+      .toEqual({ kg: 480, pct: 0, vsTypical: 'typical for this route' });
+  });
+  it('returns null when kg is missing, non-finite or non-positive', () => {
+    expect(emissionsInfo({})).toBeNull();
+    expect(emissionsInfo({ emissionsKg: 0, typicalEmissionsKg: 480 })).toBeNull();
+    expect(emissionsInfo({ emissionsKg: -12 })).toBeNull();
+    expect(emissionsInfo({ emissionsKg: NaN })).toBeNull();
+  });
+  it('has no pct or label without a usable typical', () => {
+    expect(emissionsInfo({ emissionsKg: 443 }))
+      .toEqual({ kg: 443, pct: null, vsTypical: null });
+    expect(emissionsInfo({ emissionsKg: 443, typicalEmissionsKg: 0 }))
+      .toEqual({ kg: 443, pct: null, vsTypical: null });
+  });
+});
+
+describe('layoverFlags', () => {
+  it('flags an airport change first', () => {
+    expect(layoverFlags({ airportCode: 'LGA', departAirportCode: 'JFK', durationMin: 240 }))
+      .toEqual([{ kind: 'airport_change', label: 'Change airports LGA → JFK' }]);
+  });
+  it('flags a real overnight layover instead of long', () => {
+    expect(layoverFlags({ airportCode: 'YYZ', durationMin: 648, overnight: true }))
+      .toEqual([{ kind: 'overnight', label: 'Overnight' }]);
+  });
+  it('a 40-min connection that crosses midnight is short, not overnight', () => {
+    expect(layoverFlags({ airportCode: 'MAD', durationMin: 40, overnight: true }))
+      .toEqual([{ kind: 'short', label: 'Short connection' }]);
+  });
+  it('flags a 6h+ daytime wait as a long layover', () => {
+    expect(layoverFlags({ airportCode: 'MAD', durationMin: 400 }))
+      .toEqual([{ kind: 'long', label: 'Long layover' }]);
+  });
+  it('a normal connection has no flags', () => {
+    expect(layoverFlags({ airportCode: 'MAD', durationMin: 120 })).toEqual([]);
+    expect(layoverFlags({ airportCode: 'MAD', durationMin: 150, overnight: true })).toEqual([]);
+  });
+});
+
+describe('legroomLabel', () => {
+  it('normalizes inches and in', () => {
+    expect(legroomLabel('31 inches')).toBe('31 in legroom');
+    expect(legroomLabel('31 in')).toBe('31 in legroom');
+  });
+  it('keeps other descriptions verbatim', () => {
+    expect(legroomLabel('Below average')).toBe('Below average legroom');
+  });
+  it('is null when missing or blank', () => {
+    expect(legroomLabel()).toBeNull();
+    expect(legroomLabel('')).toBeNull();
+    expect(legroomLabel('  ')).toBeNull();
   });
 });

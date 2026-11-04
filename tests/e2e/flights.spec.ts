@@ -148,3 +148,30 @@ test('flights: switch between date pairs, rapid clicks, error cell', async ({ pa
       .toBeVisible({ timeout: 30_000 });
   }
 });
+
+test('flights: emissions column sorts, layover flags and legroom in details', async ({ page }) => {
+  await signUp(page, 'E2E Emissions', uniqueEmail('emissions'));
+  await createAroundDec4Trip(page, false);
+  await page.getByRole('link', { name: 'Flights', exact: true }).click();
+  await page.getByRole('button', { name: 'Search flights' }).click();
+  await expect(outboundRows(page).first()).toBeVisible({ timeout: 60_000 });
+
+  const table = page.getByTestId('outbound-table');
+  await expect(page.getByRole('button', { name: 'Emissions', exact: true })).toBeVisible();
+  await expect(table.locator('tbody td', { hasText: /\d+ kg/ }).first()).toBeVisible();
+  await expect(table.getByText(/(below|above) typical|typical for this route/).first()).toBeVisible();
+
+  await page.getByRole('button', { name: 'Emissions', exact: true }).click();
+  const mainRows = table.locator('tbody tr.cursor-pointer');
+  const kgOf = async (i: number) => {
+    const m = /(\d+) kg/.exec(await mainRows.nth(i).locator('td').nth(4).innerText());
+    return m ? Number(m[1]) : Number.POSITIVE_INFINITY;
+  };
+  expect(await kgOf(0)).toBeLessThanOrEqual(await kgOf(1));
+
+  const stopRow = mainRows.filter({ hasText: '1 stop' }).first();
+  await stopRow.click();
+  const detail = table.locator('tbody tr').filter({ hasText: 'Layover in' }).first();
+  await expect(detail).toBeVisible();
+  await expect(detail.getByText(/legroom/).first()).toBeVisible();
+});

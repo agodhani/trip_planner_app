@@ -56,6 +56,8 @@ async function toLeg(raw: RawItinerary): Promise<FlightLeg> {
     layovers: raw.layovers.map((l) => ({
       airportCode: l.airportCode,
       airportName: l.airportName,
+      cityName: l.cityName,
+      departAirportCode: l.departAirportCode,
       durationMin: l.durationMin,
       overnight: l.overnight,
     })),
@@ -68,6 +70,8 @@ async function toLeg(raw: RawItinerary): Promise<FlightLeg> {
     durationMin: raw.durationMin ?? 0,
     stops: Math.max(0, segments.length - 1),
     airlines,
+    emissionsKg: raw.emissionsKg,
+    typicalEmissionsKg: raw.typicalEmissionsKg,
   };
 }
 

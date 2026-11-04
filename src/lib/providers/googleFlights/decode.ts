@@ -12,11 +12,19 @@ export type RawItinerary = {
   departLocal: string;
   arriveLocal: string;
   durationMin: number | null;
-  layovers: { airportCode: string; airportName?: string; durationMin: number; overnight: boolean }[];
+  layovers: {
+    airportCode: string;
+    airportName?: string;
+    cityName?: string;
+    departAirportCode?: string;
+    durationMin: number;
+    overnight: boolean;
+  }[];
   price: number | null;
   currency: string | null;
   bookingToken: string | null;
   emissionsKg?: number;
+  typicalEmissionsKg?: number;
 };
 
 export type RawSegment = {
@@ -125,6 +133,8 @@ function layoversOf(segments: RawSegment[], detailBlock: any) {
     out.push({
       airportCode: prev.to,
       airportName: Array.isArray(entry) ? (str(get(entry, 4)) ?? undefined) : undefined,
+      cityName: Array.isArray(entry) ? (str(get(entry, 5)) ?? undefined) : undefined,
+      departAirportCode: next.from !== prev.to ? next.from : undefined,
       durationMin: Math.max(
         0,
         Math.round((minutesOf(next.departLocal) - minutesOf(prev.arriveLocal)) / 60000),
@@ -153,6 +163,12 @@ function emissionsKg(detail: any): number | undefined {
   return g === null ? undefined : Math.round(g / 1000);
 }
 
+function typicalEmissionsKg(detail: any): number | undefined {
+  const block = get(detail, 22);
+  const g = num(get(block, 8));
+  return g === null || g <= 0 ? undefined : Math.round(g / 1000);
+}
+
 /** Parse one itinerary row `it` from ds:1 rows (best or other list). */
 export function parseItineraryRow(row: any): RawItinerary | null {
   const detail = get(row, 0);
@@ -176,6 +192,7 @@ export function parseItineraryRow(row: any): RawItinerary | null {
     currency,
     bookingToken: str(get(row, 8)),
     emissionsKg: emissionsKg(detail),
+    typicalEmissionsKg: typicalEmissionsKg(detail),
   };
 }
 

@@ -4,7 +4,7 @@ import { useActionState, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   BedDouble, Bus, Footprints, Lock, LockOpen, LogOut, MapPin, Pencil, Plane, PlaneLanding,
-  Printer, Sparkles, StickyNote, Trash2, Utensils, type LucideIcon,
+  Printer, Sparkles, StickyNote, Trash2, TriangleAlert, Utensils, type LucideIcon,
 } from 'lucide-react';
 import {
   addItemAction, autoArrangeAction, deleteItemAction, moveItemAction,
@@ -14,7 +14,7 @@ import type { ActionState } from '@/lib/actions/people';
 import { ui, HiddenIds } from '@/components/shortlisted-options';
 import { SubmitButton } from '@/components/submit-button';
 import { orderDay } from '@/lib/domain/itinerary';
-import { dayLabel, plural } from '@/lib/ui-format';
+import { dayLabel, money, plural } from '@/lib/ui-format';
 
 const { btn, btn2, card, inp } = ui;
 const iconBtn = 'rounded-md border border-neutral-200 p-1 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800';
@@ -25,6 +25,7 @@ type Item = {
   locked: boolean; system: boolean; unplanned: boolean;
   notes: string | null; plannedCost: number | null;
   lat: number | null; lon: number | null;
+  hoursNote: string | null;
 };
 type Leg = { id: string; fromItemId: string; toItemId: string; mode: string; durationMin: number | null; summary: string | null; deepLink: string | null; chosen: boolean };
 
@@ -47,7 +48,7 @@ function ItemCard({ it, canEdit, tripId, days, currency }: { it: Item; canEdit: 
   const when = it.kind === 'checkin' ? 'from ' : it.kind === 'checkout' ? 'by ' : '';
   const meta = [
     it.startTime ? `${when}${hm(it.startTime)}${it.endTime ? `–${hm(it.endTime)}` : ''}` : null,
-    it.plannedCost != null ? `${currency} ${it.plannedCost}` : null,
+    it.plannedCost != null ? money(it.plannedCost, currency, 2) : null,
     it.notes,
   ].filter(Boolean).join(' · ');
   return (
@@ -65,6 +66,11 @@ function ItemCard({ it, canEdit, tripId, days, currency }: { it: Item; canEdit: 
             <p className="text-xs text-neutral-500">
               {meta || (it.system ? 'Added from your selected flight/stay' : canEdit ? 'No time set' : '')}
             </p>
+            {it.hoursNote && (
+              <p className="mt-0.5 flex items-center gap-1 text-xs text-amber-700">
+                <TriangleAlert aria-hidden className="h-3 w-3 shrink-0" />{it.hoursNote}
+              </p>
+            )}
           </div>
         </div>
         {canEdit && !it.system && (
@@ -116,7 +122,8 @@ function ItemCard({ it, canEdit, tripId, days, currency }: { it: Item; canEdit: 
 
 export function ItineraryClient({ tripId, canEdit, days, items, legs, pool, currency }: {
   tripId: string; canEdit: boolean; days: string[]; currency: string;
-  items: Item[]; legs: Leg[]; pool: { id: string; title: string; lat: number | null; lon: number | null }[];
+  items: Item[]; legs: Leg[];
+  pool: { id: string; title: string; lat: number | null; lon: number | null; closedDays: string[]; closedNote: string | null }[];
 }) {
   const router = useRouter();
   const synced = useRef(false);
@@ -212,10 +219,15 @@ export function ItineraryClient({ tripId, canEdit, days, items, legs, pool, curr
                       <input type="hidden" name="kind" value="activity" /><input type="hidden" name="title" value={o.title} />
                       {o.lat != null && <><input type="hidden" name="lat" value={o.lat} /><input type="hidden" name="lon" value={o.lon ?? 0} /></>}
                       <span className="truncate font-medium" title={o.title}>{o.title}</span>
+                      {o.closedNote && <span className="text-xs text-amber-700">{o.closedNote}</span>}
                       <span className="flex gap-1.5">
                         <select name="day" aria-label={`Day for ${o.title}`} className={`${inp} min-w-0 flex-1 text-xs`} defaultValue="">
                           <option value="">Unscheduled</option>
-                          {dayOptions}
+                          {days.map((d, i) => (
+                            <option key={d} value={d}>
+                              Day {i + 1} · {dayLabel(d)}{o.closedDays.includes(d) ? ' · closed' : ''}
+                            </option>
+                          ))}
                         </select>
                         <SubmitButton className={btn2}>Add</SubmitButton>
                       </span>

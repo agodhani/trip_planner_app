@@ -57,3 +57,33 @@ test('stay: search, shortlist, select, manual entry, budget planned', async ({ p
   await expect(page.getByText('E2E Pension').first()).toBeVisible();
   await expect(page.getByRole('button', { name: /Stays \(\d+\)/ })).toBeVisible();
 });
+
+test('stay: shortlisted activities add a distance column and re-rank stays', async ({ page }) => {
+  await signUp(page, 'E2E Near', uniqueEmail('near'));
+  await page.goto('/trips/new');
+  await pickPlace(page, 'From', 'new york', 'New York, US');
+  await pickPlace(page, 'To', 'lisbon', 'Lisbon, PT');
+  await page.getByRole('button', { name: 'Around a date' }).click();
+  await page.getByLabel('Around', { exact: true }).fill('2026-12-04');
+  await page.getByRole('button', { name: 'Create trip' }).click();
+  await expect(page).toHaveURL(/\/trips\/[0-9a-f-]{36}$/);
+
+  // Shortlist the first museum so stays rank by distance to it.
+  await page.getByRole('link', { name: 'Activities', exact: true }).click();
+  await page.getByRole('button', { name: 'Museums' }).click();
+  await expect(page.getByText(/of \d+ places/).first()).toBeVisible({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Shortlist' }).first().click();
+  await expect(page.getByText('Shortlisted activities')).toBeVisible({ timeout: 15_000 });
+
+  await page.getByRole('link', { name: 'Stay', exact: true }).click();
+  await page.locator('input[type="date"]').first().fill('2026-12-04');
+  await page.locator('input[type="date"]').nth(1).fill('2026-12-07');
+  await page.getByRole('button', { name: 'Search stays' }).click();
+  await expect(page.getByText(/of \d+ stays/).first()).toBeVisible({ timeout: 30_000 });
+
+  await expect(page.getByRole('button', { name: 'To activities' })).toBeVisible();
+  await expect(page.getByText(/(km|m) avg/).first()).toBeVisible();
+  await expect(page.getByText(/shortlisted activit/).first()).toBeVisible();
+  await page.locator('tbody tr.cursor-pointer').first().click();
+  await expect(page.getByText('Your activities:')).toBeVisible();
+});

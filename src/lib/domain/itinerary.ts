@@ -61,7 +61,7 @@ export type AnchorSpec = {
  * is nearest (seeded by the day's anchor point), up to `perDay` items. Items
  * without coordinates fill the emptiest days. Locked/manual assignments
  * are untouched — this only orders the returned `assignments`. */
-export function autoAssign<T extends { id: string; lat?: number | null; lon?: number | null }>(
+export function autoAssign<T extends { id: string; lat?: number | null; lon?: number | null; avoidDays?: string[] }>(
   days: { day: string; anchor: GeoPoint | null; capacity: number }[],
   items: T[],
 ): Map<string, string[]> {
@@ -83,8 +83,11 @@ export function autoAssign<T extends { id: string; lat?: number | null; lon?: nu
   // Furthest-apart items first so clusters form naturally.
   const sorted = [...items].sort((a, b) => (b.lat != null ? 1 : 0) - (a.lat != null ? 1 : 0));
   for (const it of sorted) {
+    const avoid = new Set(it.avoidDays ?? []);
     let best: string | null = null;
     let bestScore = Infinity;
+    let fallback: string | null = null;
+    let fallbackScore = Infinity;
     for (const d of days) {
       if ((remaining.get(d.day) ?? 0) <= 0) continue;
       const c = centroidOf(d.day);
@@ -94,12 +97,17 @@ export function autoAssign<T extends { id: string; lat?: number | null; lon?: nu
           : 50 - (out.get(d.day)?.length ?? 0); // unlocated → emptiest day
       const dayLoad = (out.get(d.day)?.length ?? 0);
       const score = dist + dayLoad * 2;
+      if (score < fallbackScore) { fallbackScore = score; fallback = d.day; }
+      // Closed days are only a preference: if every day is avoided the item
+      // still gets placed, just on the best remaining day.
+      if (avoid.has(d.day)) continue;
       if (score < bestScore) { bestScore = score; best = d.day; }
     }
-    if (!best) break;
-    out.get(best)!.push(it.id);
-    remaining.set(best, (remaining.get(best) ?? 1) - 1);
-    if (it.lat != null && it.lon != null) points.get(best)!.push({ lat: it.lat, lon: it.lon });
+    const pick = best ?? fallback;
+    if (!pick) break;
+    out.get(pick)!.push(it.id);
+    remaining.set(pick, (remaining.get(pick) ?? 1) - 1);
+    if (it.lat != null && it.lon != null) points.get(pick)!.push({ lat: it.lat, lon: it.lon });
   }
 
   // Order within a day by nearest-neighbour walk from the anchor.

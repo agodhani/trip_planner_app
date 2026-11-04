@@ -77,6 +77,8 @@ npm run smoke:flights     # live Google Flights reader check: npm run smoke:flig
 - Invite links: 32-byte tokens, only the sha256 is stored; URL shown once.
 - E2E uses `tests/fixtures` replay (never network) and a truncated
   `tripplanner_test` DB; record fixtures with `npm run fixtures:record`.
+  Playwright's expect timeout is 15s because cold `next dev` compiles under
+  default-worker parallelism exceed 5s.
 
 ## UI conventions
 
@@ -96,6 +98,18 @@ npm run smoke:flights     # live Google Flights reader check: npm run smoke:flig
   paired (itinerary, routes, log) so all views agree.
 - Explain non-obvious numbers inline (scores, "from" prices, estimates)
   rather than in tooltips only.
+- Flight emissions/legroom/layover flags are per leg (`FlightLeg.emissionsKg`,
+  `typicalEmissionsKg`); format with `emissionsInfo`/`layoverFlags`/
+  `legroomLabel` in `domain/flight-rows.ts`.
+- Opening hours: Google Maps `operating_hours` saved on activity options
+  (`data.hours`) go through `domain/opening-hours.ts`. Unknown or unparseable
+  hours never warn; holiday notes are stripped (they describe the fetch week).
+- Expense splits (equal / exact / shares) go through `planSplit` in
+  `domain/money.ts`; base-currency shares always sum exactly to the expense
+  (`weightedSplit`, largest remainder). Payer and split members must be
+  travelers on the trip.
+- Stay scores: `score` is the displayed, clamped 0–100; sort and "Top pick"
+  use `rawScore` so clamped ties stay ordered.
 
 ## Testing convention (user requirement)
 

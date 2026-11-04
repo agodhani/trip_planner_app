@@ -1,17 +1,21 @@
 import type { LodgingResult } from '@/lib/providers/types';
-import { money } from '@/lib/ui-format';
+import { haversineKm, kmLabel, type GeoPoint } from '@/lib/domain/geo';
+import { money, plural } from '@/lib/ui-format';
 
 /**
  * Rule-based lodging recommendation score, 0–100 with human-readable reasons.
  * No ML: weighted blend of price position vs the result set's median nightly
- * price, overall rating, review-count confidence, and location rating.
+ * price, overall rating, review-count confidence, location rating, and —
+ * when shortlisted activities have coordinates — mean distance to them.
  */
-export type Scored<T> = T & { score: number; reasons: string[] };
+export type Scored<T> = T & { score: number; rawScore: number; reasons: string[]; activityKm?: number };
 
 const fmtPrice = (n: number, currency: string) => money(n, currency || 'USD');
+const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
 export function scoreLodgings(
   results: LodgingResult[],
+  opts: { activities?: GeoPoint[] } = {},
 ): Scored<LodgingResult>[] {
   const priced = results
     .map((r) => r.pricePerNight)
@@ -38,6 +42,22 @@ export function scoreLodgings(
       reasons.push('No price shown');
     }
 
+    // Distance to shortlisted activities: the MEAN over every point, so two
+    // clusters on opposite sides of town can't hide in the middle. +15 within
+    // 1 km, 0 at 4 km, -10 beyond 6 km.
+    let activityKm: number | undefined;
+    const acts = opts.activities ?? [];
+    if (acts.length > 0 && r.lat !== undefined && r.lon !== undefined) {
+      const km = acts.reduce((a, p) => a + haversineKm(r.lat!, r.lon!, p.lat, p.lon), 0) / acts.length;
+      activityKm = km;
+      score += clamp(15 - 5 * (km - 1), -10, 15);
+      if (km <= 2) {
+        reasons.push(`Avg ${kmLabel(km)} to your ${plural(acts.length, 'shortlisted activity', 'shortlisted activities')}`);
+      } else if (km >= 5) {
+        reasons.push(`Avg ${kmLabel(km)} from your shortlisted activities`);
+      }
+    }
+
     // Rating: 5★ ⇒ +20, 3★ ⇒ 0, below ⇒ negative.
     if (r.rating !== undefined) {
       const pts = Math.max(-15, (r.rating - 3) * 10);
@@ -61,6 +81,6 @@ export function scoreLodgings(
     }
 
     const final = Math.round(Math.max(0, Math.min(100, score)));
-    return { ...r, score: final, reasons };
+    return { ...r, score: final, rawScore: score, reasons, activityKm };
   });
 }

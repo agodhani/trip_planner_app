@@ -10,7 +10,9 @@ import { ShortlistedOptions, type ShortlistedOption } from '@/components/shortli
 import { SubmitButton } from '@/components/submit-button';
 import type { ActionState } from '@/lib/actions/people';
 import { passesWindow } from '@/lib/domain/dates/windows';
-import { flightKey, fmtMin, hhmm as t, isWellFormedItin, plusOne } from '@/lib/domain/flight-rows';
+import {
+  emissionsInfo, flightKey, fmtMin, hhmm as t, isWellFormedItin, layoverFlags, legroomLabel, plusOne,
+} from '@/lib/domain/flight-rows';
 import { dayLabel, money, nightsBetween, plural, shortDate, weekday } from '@/lib/ui-format';
 
 type Pair = {
@@ -29,11 +31,12 @@ type Itin = {
   bookingUrl: string; isBest: boolean;
 };
 type Leg = {
-  segments: { airlineCode: string; airlineName: string; flightNumber: string; from: { code: string }; to: { code: string }; departLocal: string; arriveLocal: string; aircraft?: string }[];
-  layovers: { airportCode: string; airportName?: string; durationMin: number }[];
+  segments: { airlineCode: string; airlineName: string; flightNumber: string; from: { code: string }; to: { code: string }; departLocal: string; arriveLocal: string; aircraft?: string; legroom?: string }[];
+  layovers: { airportCode: string; airportName?: string; cityName?: string; departAirportCode?: string; durationMin: number; overnight?: boolean }[];
   from: { code: string }; to: { code: string }; departLocal: string; arriveLocal: string;
   fromTz?: string; toTz?: string;
   durationMin: number; stops: number; airlines: string[];
+  emissionsKg?: number; typicalEmissionsKg?: number;
 };
 
 const btn = 'rounded-lg bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50';
@@ -43,7 +46,7 @@ const card = 'rounded-xl border border-neutral-200 bg-white p-4 shadow-sm';
 const inp = 'rounded-lg border border-neutral-300 px-2 py-1 text-sm';
 const lbl = 'flex flex-col gap-1 text-xs font-medium text-neutral-600';
 
-type SortKey = 'price' | 'duration' | 'departure';
+type SortKey = 'price' | 'duration' | 'departure' | 'emissions';
 type Mode = 'outbound' | 'return' | 'oneway';
 
 const airlineNames = (leg: Leg) =>
@@ -51,22 +54,39 @@ const airlineNames = (leg: Leg) =>
 const stopsText = (leg: Leg) => (leg.stops === 0 ? 'Nonstop' : plural(leg.stops, 'stop'));
 
 function LegDetail({ leg, label }: { leg: Leg; label: string }) {
+  const em = emissionsInfo(leg);
   return (
     <div className="mb-2 last:mb-0">
       <p className="font-medium text-neutral-700">{label} · {dayLabel(leg.departLocal)}</p>
-      {leg.segments.map((s, i) => (
-        <div key={i}>
-          <p>
-            {t(s.departLocal)} {s.from.code} → {t(s.arriveLocal)} {s.to.code} · {s.airlineName} {s.airlineCode} {s.flightNumber}
-            {s.aircraft && ` · ${s.aircraft}`}
-          </p>
-          {leg.layovers[i] && (
-            <p className="pl-3 text-neutral-500">
-              Layover in {leg.layovers[i].airportName ?? leg.layovers[i].airportCode} · {fmtMin(leg.layovers[i].durationMin)}
+      {leg.segments.map((s, i) => {
+        const legroom = legroomLabel(s.legroom);
+        const lay = leg.layovers[i];
+        return (
+          <div key={i}>
+            <p>
+              {t(s.departLocal)} {s.from.code} → {t(s.arriveLocal)} {s.to.code} · {s.airlineName} {s.airlineCode} {s.flightNumber}
+              {s.aircraft && ` · ${s.aircraft}`}
+              {legroom && ` · ${legroom}`}
             </p>
-          )}
-        </div>
-      ))}
+            {lay && (
+              <p className="pl-3 text-neutral-500">
+                Layover in {lay.cityName ?? lay.airportName ?? lay.airportCode}
+                {lay.cityName && (lay.airportName ? ` · ${lay.airportName} (${lay.airportCode})` : ` · ${lay.airportCode}`)}
+                {' · '}{fmtMin(lay.durationMin)}
+                {layoverFlags(lay).map((f) => (
+                  <span key={f.kind} className="text-amber-700"> · {f.label}</span>
+                ))}
+              </p>
+            )}
+          </div>
+        );
+      })}
+      {em && (
+        <p className="text-neutral-500">
+          Emissions: {em.kg} kg CO₂e
+          {em.vsTypical && ` · ${em.vsTypical} (${leg.typicalEmissionsKg} kg)`}
+        </p>
+      )}
     </div>
   );
 }
@@ -92,10 +112,15 @@ function FlightTable({
   );
   return (
     <div className="overflow-x-auto" data-testid={testId}>
+      <p className="mb-2 text-xs text-neutral-500">
+        Emissions are Google&apos;s per-passenger CO₂e estimate compared with a typical flight on this route.
+        Click a row for legroom, aircraft and layover details.
+      </p>
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-neutral-200 text-xs uppercase tracking-wide text-neutral-500">
             {th('Airline')}{th('Departs → Arrives', 'departure')}{th('Duration', 'duration')}{th('Stops')}
+            {th('Emissions', 'emissions')}
             {th(mode === 'outbound' ? 'Round trip from' : mode === 'return' ? 'Round trip' : 'Price', 'price', true)}
             <th><span className="sr-only">Actions</span></th>
           </tr>
@@ -132,9 +157,32 @@ function FlightTable({
                   <span className={leg.stops === 0 ? 'font-medium text-teal-700' : 'text-neutral-700'}>{stopsText(leg)}</span>
                   {leg.stops > 0 && (
                     <span className="block text-neutral-500">
-                      {leg.layovers.map((l) => `${l.airportCode} ${fmtMin(l.durationMin)}`).join(', ')}
+                      {leg.layovers.map((l, i) => (
+                        <span key={i} className="block">
+                          <span className="whitespace-nowrap">{l.airportCode} {fmtMin(l.durationMin)}</span>
+                          {layoverFlags(l).map((f) => (
+                            <span key={f.kind} className="block text-amber-700">{f.label}</span>
+                          ))}
+                        </span>
+                      ))}
                     </span>
                   )}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2.5">
+                  {(() => {
+                    const em = emissionsInfo(leg);
+                    if (!em) return <span className="text-neutral-400">—</span>;
+                    return (
+                      <>
+                        <span className="font-medium">{em.kg} kg</span>
+                        {em.vsTypical && (
+                          <span className={`block text-xs ${em.pct !== null && em.pct < 0 ? 'text-teal-700' : 'text-neutral-500'}`}>
+                            {em.vsTypical}
+                          </span>
+                        )}
+                      </>
+                    );
+                  })()}
                 </td>
                 <td className="whitespace-nowrap px-3 py-2.5 text-right">
                   <span className="text-base font-semibold">{money(it.price.total, it.price.currency)}</span>
@@ -166,7 +214,7 @@ function FlightTable({
               </tr>,
               open === it.id && (
                 <tr key={`${it.id}-detail`} className="border-b border-neutral-200 bg-neutral-50">
-                  <td colSpan={6} className="px-3 py-2 text-xs text-neutral-600">
+                  <td colSpan={7} className="px-3 py-2 text-xs text-neutral-600">
                     <LegDetail leg={it.outbound} label="Outbound" />
                     {it.return && <LegDetail leg={it.return} label="Return" />}
                   </td>
@@ -307,6 +355,7 @@ export function FlightsClient({
   ).sort((a, b) =>
     sortBy === 'price' ? (a.price.total ?? 1e15) - (b.price.total ?? 1e15)
     : sortBy === 'duration' ? a.outbound.durationMin - b.outbound.durationMin
+    : sortBy === 'emissions' ? (a.outbound.emissionsKg ?? 1e15) - (b.outbound.emissionsKg ?? 1e15)
     : a.outbound.departLocal.localeCompare(b.outbound.departLocal));
   const airlineName = new Map<string, string>();
   for (const it of wellFormed) for (const s of it.outbound.segments) airlineName.set(s.airlineCode, s.airlineName || s.airlineCode);
@@ -327,6 +376,7 @@ export function FlightsClient({
     .sort((a, b) =>
       sortBy === 'price' ? (a.price.total ?? 1e15) - (b.price.total ?? 1e15)
       : sortBy === 'duration' ? (a.return?.durationMin ?? 0) - (b.return?.durationMin ?? 0)
+      : sortBy === 'emissions' ? (a.return?.emissionsKg ?? 1e15) - (b.return?.emissionsKg ?? 1e15)
       : (a.return?.departLocal ?? '').localeCompare(b.return?.departLocal ?? ''));
 
   const tableProps = {

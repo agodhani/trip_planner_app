@@ -54,3 +54,53 @@ export function stopsLabel(leg: LegLike) {
     ? 'nonstop'
     : `${leg.stops} stop${leg.stops > 1 ? 's' : ''} ${leg.layovers.map((l) => l.airportCode).join(', ')}`;
 }
+
+export const OVERNIGHT_LAYOVER_MIN = 180;
+export const SHORT_CONNECTION_MIN = 60;
+export const LONG_LAYOVER_MIN = 360;
+
+/** CO₂e vs the route's typical flight — pct is null when Google gives no typical. */
+export function emissionsInfo(leg: { emissionsKg?: number; typicalEmissionsKg?: number }): {
+  kg: number; pct: number | null; vsTypical: string | null;
+} | null {
+  const kg = leg.emissionsKg;
+  if (kg === undefined || !Number.isFinite(kg) || kg <= 0) return null;
+  const typical = leg.typicalEmissionsKg;
+  const pct = typical !== undefined && typical > 0
+    ? Math.round(((kg - typical) / typical) * 100)
+    : null;
+  const vsTypical = pct === null
+    ? null
+    : pct < 0
+      ? `${-pct}% below typical`
+      : pct > 0
+        ? `${pct}% above typical`
+        : 'typical for this route';
+  return { kg, pct, vsTypical };
+}
+
+export type LayoverFlag = { kind: 'airport_change' | 'overnight' | 'short' | 'long'; label: string };
+
+export function layoverFlags(l: {
+  airportCode: string; durationMin: number; overnight?: boolean; departAirportCode?: string;
+}): LayoverFlag[] {
+  const flags: LayoverFlag[] = [];
+  if (l.departAirportCode) {
+    flags.push({ kind: 'airport_change', label: `Change airports ${l.airportCode} → ${l.departAirportCode}` });
+  }
+  const overnight = l.overnight === true && l.durationMin >= OVERNIGHT_LAYOVER_MIN;
+  if (overnight) flags.push({ kind: 'overnight', label: 'Overnight' });
+  if (l.durationMin < SHORT_CONNECTION_MIN) {
+    flags.push({ kind: 'short', label: 'Short connection' });
+  } else if (l.durationMin >= LONG_LAYOVER_MIN && !overnight) {
+    flags.push({ kind: 'long', label: 'Long layover' });
+  }
+  return flags;
+}
+
+/** '31 inches' / '31 in' → '31 in legroom'; other text → '<text> legroom'. */
+export function legroomLabel(s?: string): string | null {
+  if (!s || !s.trim()) return null;
+  const m = /^(\d+(?:\.\d+)?)\s*(?:inches|in)$/i.exec(s.trim());
+  return m ? `${m[1]} in legroom` : `${s.trim()} legroom`;
+}

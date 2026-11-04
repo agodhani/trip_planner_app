@@ -1,10 +1,11 @@
 import 'server-only';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { itineraryItems, transportLegs, tripOptions } from '@/lib/db/schema';
 import { todayISO } from '@/lib/clock';
 import { candidatePairs } from '@/lib/domain/dates/strategy';
 import { autoAssign, dayList, to24h } from '@/lib/domain/itinerary';
+import { hoursWarning } from '@/lib/domain/opening-hours';
 import { env } from '@/lib/env';
 import { dayLabel } from '@/lib/ui-format';
 import { assertTripRole, NotFoundError } from './access';
@@ -261,6 +262,14 @@ export async function autoArrange(user: { id: string; name: string }, tripId: st
   if (!free.length) return { assigned: 0 };
 
   const locOf = (i: ItemRow) => (i.location as { lat?: number; lon?: number } | null);
+  // Google Maps hours on the shortlisted option tell us which days to avoid.
+  const hoursByOption = new Map<string, unknown>();
+  const optIds = free.map((i) => i.optionId).filter((x): x is string => !!x);
+  if (optIds.length) {
+    const opts = await db.select().from(tripOptions)
+      .where(and(eq(tripOptions.tripId, tripId), inArray(tripOptions.id, optIds)));
+    for (const o of opts) hoursByOption.set(o.id, (o.data as { hours?: unknown }).hours);
+  }
   const anchorByDay = new Map<string, { lat: number; lon: number } | null>();
   for (const d of range.days) {
     const stay = items.find((i) => i.system && i.day === d && (i.kind === 'checkin' || i.kind === 'checkout') && locOf(i)?.lat != null);
@@ -270,7 +279,16 @@ export async function autoArrange(user: { id: string; name: string }, tripId: st
   const perDay = Math.max(2, Math.ceil(free.length / Math.max(1, range.days.length)));
   const plan = autoAssign(
     range.days.map((d) => ({ day: d, anchor: anchorByDay.get(d) ?? null, capacity: perDay })),
-    free.map((i) => ({ id: i.id, lat: locOf(i)?.lat ?? null, lon: locOf(i)?.lon ?? null })),
+    free.map((i) => {
+      const hours = i.optionId ? hoursByOption.get(i.optionId) : undefined;
+      const avoidDays = hours === undefined
+        ? undefined
+        : range.days.filter((d) => hoursWarning(hours, d)?.kind === 'closed');
+      return {
+        id: i.id, lat: locOf(i)?.lat ?? null, lon: locOf(i)?.lon ?? null,
+        avoidDays: avoidDays?.length ? avoidDays : undefined,
+      };
+    }),
   );
 
   await db.transaction(async (tx) => {

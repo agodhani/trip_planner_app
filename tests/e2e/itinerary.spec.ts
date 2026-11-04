@@ -38,3 +38,35 @@ test('itinerary: custom items, move to a day, edit details, manual leg without c
   await page.getByRole('button', { name: 'Add leg' }).click();
   await expect(page.getByText('via added manually')).toBeVisible({ timeout: 15_000 });
 });
+
+test('itinerary: opening hours — closed-day note, warning, and moving off the day', async ({ page }) => {
+  await signUp(page, 'E2E Hours', uniqueEmail('hours'));
+  await createTripWeekendsInNov2026(page);
+  // The trip spans Thu Nov 5 – Mon Nov 9 2026 (Day 4 = Sunday); Carmo is closed Sundays.
+  await page.getByRole('link', { name: 'Activities', exact: true }).click();
+  await page.getByRole('button', { name: 'Museums' }).click();
+  await expect(page.getByText(/of \d+ places/).first()).toBeVisible({ timeout: 30_000 });
+  const carmoRow = page.locator('tr', { hasText: 'Carmo Archaeological Museum' }).first();
+  await carmoRow.click();
+  await expect(page.getByText(/Hours: /).first()).toBeVisible();
+  await carmoRow.getByRole('button', { name: 'Shortlist', exact: true }).click();
+  await expect(page.getByText('Shortlisted activities')).toBeVisible({ timeout: 15_000 });
+
+  await page.getByRole('link', { name: 'Itinerary', exact: true }).click();
+  const poolCard = page.locator('li', { hasText: 'Carmo Archaeological Museum' }).first();
+  await expect(poolCard.getByText('Closed Sun')).toBeVisible({ timeout: 15_000 });
+  const daySel = poolCard.getByLabel('Day for Carmo Archaeological Museum');
+  await expect(daySel.locator('option', { hasText: 'closed' })).toHaveCount(1);
+
+  await daySel.selectOption('2026-11-08');
+  await poolCard.getByRole('button', { name: 'Add' }).click();
+  const day4 = page.locator('section').filter({ has: page.getByRole('heading', { name: /Day 4/ }) }).first();
+  await expect(day4.getByText('Carmo Archaeological Museum')).toBeVisible({ timeout: 15_000 });
+  await expect(day4.getByText('Closed on Sundays (Google Maps hours)')).toBeVisible();
+
+  // Move it to Friday (open) — the warning clears.
+  await day4.getByLabel('Move to day').first().selectOption('2026-11-06');
+  const day2 = page.locator('section').filter({ has: page.getByRole('heading', { name: /Day 2/ }) }).first();
+  await expect(day2.getByText('Carmo Archaeological Museum')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Closed on Sundays')).toHaveCount(0);
+});

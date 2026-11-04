@@ -26,10 +26,16 @@ export default async function BudgetPage({ params }: { params: Promise<{ tripId:
       defaultDate={defaultDate}
       defaultPayerId={tvl.find((t) => t.userId === user.id)?.id ?? tvl[0]?.id ?? ''}
       travelers={tvl.map((t) => ({ id: t.id, name: t.displayName }))}
-      expenses={exps.map(({ expense, payer }) => ({
+      expenses={exps.map(({ expense, payer, shares }) => ({
         id: expense.id, description: expense.description, category: expense.category,
         amount: Number(expense.amount), currency: expense.currency,
         amountBase: Number(expense.amountBase), spentOn: expense.spentOn, payer,
+        splitMethod: expense.splitMethod,
+        shares: shares.map((s) => ({
+          travelerId: s.travelerId,
+          shares: s.shares === null ? null : Number(s.shares),
+          exactAmount: s.exactAmount === null ? null : Number(s.exactAmount),
+        })),
       }))}
     />
   );

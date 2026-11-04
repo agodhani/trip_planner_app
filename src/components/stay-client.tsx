@@ -47,31 +47,36 @@ const DATE_SOURCE: Record<StayDates['source'], string> = {
   flight: 'from your selected flight', trip: 'from your trip dates', strategy: 'from your date plan',
 };
 
-type StaySort = 'score' | 'price' | 'rating';
+type StaySort = 'score' | 'price' | 'rating' | 'activities';
+export type ActivityPoint = { id: string; title: string; lat: number; lon: number };
 
 /** Compact comparison table; click a row to expand details. */
-function LodgingTable({ items, canEdit, onShortlist, isShortlisted, isPending, topIds, nearPoint, sortBy, onSort }: {
+function LodgingTable({ items, canEdit, onShortlist, isShortlisted, isPending, topIds, nearPoint, activities, sortBy, onSort }: {
   items: Scored<LodgingResult>[]; canEdit: boolean; onShortlist: (l: LodgingResult) => void;
   isShortlisted: (l: LodgingResult) => boolean; isPending: (l: LodgingResult) => boolean;
-  topIds: Set<string>; nearPoint: GeoPoint | null; sortBy: StaySort; onSort: (k: StaySort) => void;
+  topIds: Set<string>; nearPoint: GeoPoint | null; activities: ActivityPoint[];
+  sortBy: StaySort; onSort: (k: StaySort) => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const th = (label: string, k?: StaySort, right = false) => (
     <th className={`whitespace-nowrap px-3 py-2 font-medium ${right ? 'text-right' : 'text-left'}`}>
       {k ? (
         <button type="button" onClick={() => onSort(k)} className={`hover:text-teal-700 ${sortBy === k ? 'text-teal-700' : ''}`}>
-          {label}{sortBy === k && (k === 'price' ? ' ↑' : ' ↓')}
+          {label}{sortBy === k && (k === 'price' || k === 'activities' ? ' ↑' : ' ↓')}
         </button>
       ) : label}
     </th>
   );
+  const cols = 5 + (nearPoint ? 1 : 0) + (activities.length > 0 ? 1 : 0);
   return (
     <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-neutral-200 text-xs uppercase tracking-wide text-neutral-500">
             {th('Stay')}{th('Rating', 'rating')}{th('Score', 'score', true)}{th('Price', 'price', true)}
-            {nearPoint && th('Distance', undefined, true)}<th><span className="sr-only">Actions</span></th>
+            {nearPoint && th('Distance', undefined, true)}
+            {activities.length > 0 && th('To activities', 'activities', true)}
+            <th><span className="sr-only">Actions</span></th>
           </tr>
         </thead>
         <tbody>
@@ -114,6 +119,11 @@ function LodgingTable({ items, canEdit, onShortlist, isShortlisted, isPending, t
                   {l.totalPrice !== undefined && <span className="block text-xs text-neutral-500">{money(l.totalPrice, l.currency)} total</span>}
                 </td>
                 {nearPoint && <td className="whitespace-nowrap px-3 py-2 text-right text-xs text-neutral-600">{dist !== undefined ? kmLabel(dist) : '—'}</td>}
+                {activities.length > 0 && (
+                  <td className="whitespace-nowrap px-3 py-2 text-right text-xs text-neutral-600">
+                    {l.activityKm !== undefined ? `${kmLabel(l.activityKm)} avg` : '—'}
+                  </td>
+                )}
                 <td className="px-3 py-2">
                   <span className="flex items-center justify-end gap-1.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                     {canEdit && (isShortlisted(l) ? (
@@ -135,9 +145,19 @@ function LodgingTable({ items, canEdit, onShortlist, isShortlisted, isPending, t
               </tr>,
               open === l.id && (
                 <tr key={`${l.id}-detail`} className="border-b border-neutral-200 bg-neutral-50">
-                  <td colSpan={nearPoint ? 6 : 5} className="px-3 py-2 text-xs text-neutral-600">
+                  <td colSpan={cols} className="px-3 py-2 text-xs text-neutral-600">
                     {l.description && <p>{l.description}</p>}
                     {l.reasons.length > 0 && <p className="mt-0.5 text-teal-700">Why this score: {l.reasons.join(' · ')}</p>}
+                    {activities.length > 0 && l.lat !== undefined && l.lon !== undefined && (
+                      <p className="mt-0.5">
+                        Your activities: {activities
+                          .map((a) => ({ title: a.title, km: haversineKm(l.lat!, l.lon!, a.lat, a.lon) }))
+                          .sort((a, b) => a.km - b.km)
+                          .slice(0, 5)
+                          .map((a) => `${a.title} ${kmLabel(a.km)}`)
+                          .join(' · ')}
+                      </p>
+                    )}
                     {l.locationRating !== undefined && <p className="mt-0.5">Location rating {l.locationRating}/5</p>}
                     {l.nearbyPlaces.length > 0 && <p className="mt-0.5">Near {l.nearbyPlaces.slice(0, 3).join(', ')}</p>}
                     {l.amenities.length > 0 && <p className="mt-0.5">{l.amenities.join(' · ')}</p>}
@@ -156,7 +176,7 @@ function LodgingTable({ items, canEdit, onShortlist, isShortlisted, isPending, t
 }
 
 export function StayClient({
-  tripId, canEdit, dates, centers, serpApi, currency, options,
+  tripId, canEdit, dates, centers, serpApi, currency, options, activities,
 }: {
   tripId: string;
   canEdit: boolean;
@@ -165,6 +185,7 @@ export function StayClient({
   serpApi: SerpApiStatus;
   currency: string;
   options: ShortlistedOption[];
+  activities: ActivityPoint[];
 }) {
   const router = useRouter();
   const [checkIn, setCheckIn] = useState(dates?.checkIn ?? '');
@@ -184,7 +205,7 @@ export function StayClient({
   const [showMap, setShowMap] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ kind: string; message: string } | null>(null);
-  const [results, setResults] = useState<Scored<LodgingResult>[] | null>(null);
+  const [raw, setRaw] = useState<LodgingResult[] | null>(null);
   const [ads, setAds] = useState<LodgingResult[]>([]);
   const [searched, setSearched] = useState<{ checkIn: string; checkOut: string; params: string } | null>(null);
   const [pending, setPending] = useState<Set<string>>(new Set());
@@ -214,6 +235,12 @@ export function StayClient({
     return shortlistOptionAction(fd);
   }, {});
 
+  // Re-scored whenever the activity shortlist changes — no new search needed.
+  const results = useMemo(
+    () => (raw === null ? null : scoreLodgings(raw, { activities })),
+    [raw, activities],
+  );
+
   const nearPoint: GeoPoint | null = useMemo(() => {
     if (nearKey === 'pin') return pin;
     return centers.find((c) => c.key === nearKey)?.point ?? centers[0]?.point ?? null;
@@ -240,7 +267,7 @@ export function StayClient({
       const res = await fetch(`/api/trips/${tripId}/stay?${paramString}`);
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? { kind: 'error', message: 'Search failed' }); return; }
-      setResults(scoreLodgings(data.lodgings ?? []));
+      setRaw(data.lodgings ?? []);
       setAds(data.ads ?? []);
       setSearched({ checkIn, checkOut, params: paramString });
     } catch {
@@ -291,12 +318,13 @@ export function StayClient({
       ? list.filter((l) => l.lat !== undefined && l.lon !== undefined && haversineKm(nearPoint.lat, nearPoint.lon, l.lat, l.lon) <= radiusKm)
       : list;
     return [...filtered].sort((a, b) =>
-      sortBy === 'score' ? b.score - a.score
+      sortBy === 'score' ? b.rawScore - a.rawScore
       : sortBy === 'price' ? (a.pricePerNight ?? 1e15) - (b.pricePerNight ?? 1e15)
+      : sortBy === 'activities' ? (a.activityKm ?? 1e15) - (b.activityKm ?? 1e15)
       : (b.rating ?? -1) - (a.rating ?? -1));
   }, [results, radiusKm, nearPoint, sortBy]);
   const topIds = useMemo(
-    () => new Set([...(results ?? [])].sort((a, b) => b.score - a.score).slice(0, 3).map((l) => l.id)),
+    () => new Set([...(results ?? [])].sort((a, b) => b.rawScore - a.rawScore).slice(0, 3).map((l) => l.id)),
     [results],
   );
 
@@ -444,7 +472,10 @@ export function StayClient({
           </div>
           <p className="flex items-start gap-1.5 text-xs text-neutral-500">
             <Info aria-hidden className="mt-px h-3.5 w-3.5 shrink-0" />
-            Score (0–100) blends price vs. the typical rate, guest rating, number of reviews, and location. Distances are from {nearLabel}. Click a row for details.
+            Score (0–100) blends price vs. the typical rate, guest rating, number of reviews, location{activities.length > 0
+              ? `, and average distance to your ${plural(activities.length, 'shortlisted activity', 'shortlisted activities')} (closer scores higher)`
+              : ''}. Distances are from {nearLabel}. Click a row for details.
+            {activities.length === 0 && ' Shortlist activities first and stays near them score higher.'}
           </p>
           {showMap && (
             <div>
@@ -456,7 +487,7 @@ export function StayClient({
             <LodgingTable
               items={visible} canEdit={canEdit} onShortlist={shortlist}
               isShortlisted={(l) => shortlistedKeys.has(keyOf(l))} isPending={(l) => pending.has(keyOf(l))}
-              topIds={topIds} nearPoint={nearPoint} sortBy={sortBy} onSort={setSortBy}
+              topIds={topIds} nearPoint={nearPoint} activities={activities} sortBy={sortBy} onSort={setSortBy}
             />
           )}
           {visible.length === 0 && <p className="text-sm text-neutral-500">No stays match — widen the distance or filters.</p>}

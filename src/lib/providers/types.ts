@@ -57,6 +57,8 @@ export type FlightSegment = {
 export type Layover = {
   airportCode: string;
   airportName?: string;
+  cityName?: string;
+  departAirportCode?: string;
   durationMin: number;
   overnight?: boolean;
 };
@@ -73,6 +75,8 @@ export type FlightLeg = {
   durationMin: number;
   stops: number;
   airlines: string[];
+  emissionsKg?: number;
+  typicalEmissionsKg?: number;
 };
 
 export type FlightItinerary = {

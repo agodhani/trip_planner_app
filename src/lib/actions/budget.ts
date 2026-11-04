@@ -8,7 +8,44 @@ import { NotFoundError } from '@/lib/services/access';
 import {
   addExpense, addJournalEntry, deleteExpense, setItemOutcome, setTripStatus,
 } from '@/lib/services/expenses';
+import type { SplitInput } from '@/lib/domain/money';
 import type { ActionState } from './people';
+
+const uuid = z.string().uuid();
+
+function parseSplit(formData: FormData): SplitInput | undefined | { error: string } {
+  const method = String(formData.get('splitMethod') ?? '');
+  if (method === '') return undefined;
+  if (method === 'equal') {
+    const ids = formData.getAll('splitWith').map(String);
+    if (!ids.every((id) => uuid.safeParse(id).success)) return { error: 'Invalid split' };
+    return { method: 'equal', travelerIds: ids };
+  }
+  if (method === 'exact') {
+    const parts: { travelerId: string; cents: number }[] = [];
+    for (const [k, v] of formData.entries()) {
+      if (!k.startsWith('exact:')) continue;
+      const travelerId = k.slice(6);
+      if (!uuid.safeParse(travelerId).success) return { error: 'Invalid split' };
+      const n = Number(String(v).trim() === '' ? 0 : v);
+      if (!Number.isFinite(n)) return { error: 'Enter valid amounts' };
+      parts.push({ travelerId, cents: Math.round(n * 100) });
+    }
+    return { method: 'exact', parts };
+  }
+  if (method === 'shares') {
+    const parts: { travelerId: string; shares: number }[] = [];
+    for (const [k, v] of formData.entries()) {
+      if (!k.startsWith('shares:')) continue;
+      const travelerId = k.slice(7);
+      if (!uuid.safeParse(travelerId).success) return { error: 'Invalid split' };
+      const n = Number(String(v).trim() === '' ? 0 : v);
+      parts.push({ travelerId, shares: n });
+    }
+    return { method: 'shares', parts };
+  }
+  return { error: 'Invalid split' };
+}
 
 export async function addExpenseAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const tripId = String(formData.get('tripId') ?? '');
@@ -24,8 +61,10 @@ export async function addExpenseAction(_prev: ActionState, formData: FormData): 
   });
   const p = schema.safeParse(formFields(formData));
   if (!p.success) return { error: p.error.issues[0]?.message ?? 'Invalid input' };
+  const split = parseSplit(formData);
+  if (split && 'error' in split) return { error: split.error };
   try {
-    await addExpense(user, tripId, { ...p.data, notes: p.data.notes || null });
+    await addExpense(user, tripId, { ...p.data, notes: p.data.notes || null, split });
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Could not add expense' };
   }

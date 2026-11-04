@@ -76,3 +76,54 @@ describe('normalizeLocal', () => {
     expect(r.lat).toBe(1);
   });
 });
+
+describe('scoreLodgings with shortlisted activities', () => {
+  const acts = [{ lat: 38.72, lon: -9.14 }, { lat: 38.72, lon: -9.13 }];
+  const base = { pricePerNight: 100, rating: 4.2, reviews: 500, currency: 'USD' };
+
+  it('a closer hotel beats an otherwise identical farther one', () => {
+    const [near, far] = scoreLodgings([
+      mk({ id: 'near', ...base, lat: 38.72, lon: -9.14 }),
+      mk({ id: 'far', ...base, lat: 38.78, lon: -9.14 }),
+    ], { activities: acts });
+    expect(near.score).toBeGreaterThan(far.score);
+    expect(near.activityKm).toBeLessThan(far.activityKm!);
+  });
+  it('a co-located hotel gets activityKm 0 and the "to your" reason', () => {
+    const same = [{ lat: 38.72, lon: -9.14 }, { lat: 38.72, lon: -9.14 }];
+    const [s] = scoreLodgings([mk({ id: 'x', ...base, lat: 38.72, lon: -9.14 })], { activities: same });
+    expect(s.activityKm).toBe(0);
+    expect(s.reasons).toContain('Avg 0 m to your 2 shortlisted activities');
+  });
+  it('a 6 km+ hotel gets the -10 and the "from your" reason', () => {
+    const [far] = scoreLodgings([mk({ id: 'x', ...base, lat: 38.79, lon: -9.14 })], { activities: acts });
+    const [plain] = scoreLodgings([mk({ id: 'x', ...base, lat: 38.79, lon: -9.14 })]);
+    expect(far.activityKm).toBeGreaterThanOrEqual(6);
+    expect(far.score).toBe(plain.score - 10);
+    expect(far.reasons.some((r) => r.includes('from your shortlisted activities'))).toBe(true);
+  });
+  it('with no activities the output is identical to today', () => {
+    const list = [mk({ id: 'a', ...base, lat: 38.72, lon: -9.14 }), mk({ id: 'b' })];
+    expect(scoreLodgings(list, { activities: [] })).toEqual(scoreLodgings(list));
+    expect(scoreLodgings(list, {})).toEqual(scoreLodgings(list));
+  });
+  it('a hotel without coordinates gets no activityKm and no proximity reason', () => {
+    const [s] = scoreLodgings([mk({ id: 'x', ...base })], { activities: acts });
+    expect(s.activityKm).toBeUndefined();
+    expect(s.reasons.join(' ')).not.toMatch(/activities/);
+  });
+});
+
+describe('rawScore tie-breaking', () => {
+  it('clamped score 100 stays separate by rawScore on proximity', () => {
+    const top = { pricePerNight: 20, rating: 4.9, reviews: 6000, locationRating: 5, currency: 'USD' };
+    const acts = [{ lat: 38.72, lon: -9.14 }];
+    const [near, far] = scoreLodgings([
+      mk({ id: 'near', ...top, lat: 38.72, lon: -9.14 }),
+      mk({ id: 'far', ...top, lat: 38.7425, lon: -9.14 }), // ~2.5 km
+    ], { activities: acts });
+    expect(near.score).toBe(100);
+    expect(far.score).toBe(100);
+    expect(near.rawScore).toBeGreaterThan(far.rawScore);
+  });
+});
