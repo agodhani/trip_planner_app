@@ -49,3 +49,15 @@ test('a non-member opening a trip URL gets 404', async ({ page, browser }) => {
   expect(res?.status()).toBe(404);
   await ctx.close();
 });
+
+// Regression: Next 16's dev server only trusts `localhost` by default, so a
+// page opened at 127.0.0.1 never hydrated — sign-up/login (plain forms)
+// worked, then nothing after sign-in did (place picker dead, no trip).
+test.describe('opened at 127.0.0.1 instead of localhost', () => {
+  test.use({ baseURL: 'http://127.0.0.1:3100' });
+
+  test('the app stays interactive after sign-in', async ({ page }) => {
+    await signUp(page, 'E2E Loopback', uniqueEmail('loopback'));
+    await createTripWeekendsInNov2026(page);
+  });
+});
