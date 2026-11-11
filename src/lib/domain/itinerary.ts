@@ -40,6 +40,105 @@ export function orderDay<T extends DayItem>(items: T[]): T[] {
   return [...items].sort((a, b) => key(a) - key(b) || a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
 }
 
+const MIN_MIN = 5 * 60; // 05:00
+const MAX_MIN = 23 * 60 + 45; // 23:45
+
+const fmtMins = (m: number): string => {
+  const h = Math.floor(m / 60);
+  const mi = Math.floor(m % 60);
+  const s = Math.round((m - Math.floor(m)) * 60);
+  return `${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')}${s ? `:${String(s).padStart(2, '0')}` : ''}`;
+};
+
+export type DropResult = {
+  day: string | null;
+  startTime: string | null;
+  sortOrder: number;
+  /** Renumbered sibling sortOrders (id → new sortOrder), when normalization was needed. */
+  siblings?: { id: string; sortOrder: number }[];
+};
+
+/**
+ * Where a dropped card should land so the column's orderDay() order equals the
+ * order the user sees. `items` are the target column's items (any order),
+ * `targetIndex` the insertion slot among the column's items excluding the
+ * dragged one — i.e. the index of the card it was dropped on (or the column
+ * length for a drop on empty space).
+ *
+ * Rules: between two timed items the card takes the midpoint time (snapped to
+ * :00/:15/:30/:45; below a 15-minute gap the raw midpoint is used and
+ * sortOrder breaks the tie). Any other slot keeps it untimed and relies on
+ * sortOrder. Edge slots use prev+60min / next−60min clamped to 05:00–23:45.
+ * Anchors (system/locked) are never modified — only their neighbour values
+ * are read; the dropped item always lands between them, never on them.
+ */
+export function computeDrop<T extends DayItem>(
+  items: T[],
+  itemId: string,
+  targetDay: string | null,
+  targetIndex: number,
+): DropResult {
+  const rest = orderDay(items.filter((i) => i.id !== itemId));
+  const k = Math.max(0, Math.min(targetIndex, rest.length));
+  const prev = k > 0 ? rest[k - 1] : undefined;
+  const next = k < rest.length ? rest[k] : undefined;
+
+  // Slot sortOrder: renumber the column ×10 so the dragged item always fits
+  // between its neighbours (prev = k*10, next = (k+1)*10 → k*10+5).
+  const renumbered = rest.map((r, i) => (i + 1) * 10);
+  const needsRenumber = rest.some((r, i) => r.sortOrder !== renumbered[i]);
+  const siblings = needsRenumber ? rest.map((r, i) => ({ id: r.id, sortOrder: renumbered[i] })) : undefined;
+  const sortOrder = needsRenumber ? k * 10 + 5
+    : prev && next ? Math.floor((prev.sortOrder + next.sortOrder) / 2)
+    : prev ? prev.sortOrder + 10
+    : next ? next.sortOrder - 10
+    : 10;
+  // If the non-renumbered midpoint collides (adjacent or equal sortOrders),
+  // fall back to the renumbered scheme so the item lands exactly at k.
+  const midClash = !needsRenumber && prev && next && next.sortOrder - prev.sortOrder < 2;
+  const final = midClash
+    ? { sortOrder: k * 10 + 5, siblings: rest.map((r, i) => ({ id: r.id, sortOrder: (i + 1) * 10 })) as DropResult['siblings'] }
+    : { sortOrder, siblings };
+
+  const minsOf = (t: string | null) => (t ? Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)) : null);
+  const prevM = prev ? minsOf(prev.startTime) : null;
+  const nextM = next ? minsOf(next.startTime) : null;
+
+  let startTime: string | null = null;
+  if (prev && next) {
+    if (prevM !== null && nextM !== null) {
+      const gap = nextM - prevM;
+      const mid = (prevM + nextM) / 2;
+      // Snap to quarter hours when there is room; otherwise the raw midpoint
+      // (or a boundary collision) is fine — sortOrder keeps it at slot k.
+      const snapped = gap >= 15 ? Math.round(mid / 15) * 15 : mid;
+      startTime = fmtMins(Math.max(MIN_MIN, Math.min(MAX_MIN, snapped)));
+    }
+    // Mixed neighbours (one timed, one untimed): stay untimed — orderDay only
+    // ever shows this boundary at the untimed cluster's edge, where an untimed
+    // card lands exactly at slot k.
+  } else if (prevM !== null) {
+    startTime = fmtMins(Math.min(MAX_MIN, prevM + 60));
+  } else if (nextM !== null) {
+    startTime = fmtMins(Math.max(MIN_MIN, nextM - 60));
+  }
+  return { day: targetDay, startTime, sortOrder: final.sortOrder, siblings: final.siblings };
+}
+
+/**
+ * Days where auto-arrange may place destination activities: from the first
+ * arrival at the destination to the last departure back, intersected with the
+ * trip's days. With no flight anchors every trip day is fair game.
+ */
+export function arrangeableDays(days: string[], anchors: { kind: string; day: string }[]): string[] {
+  const arrives = anchors.filter((a) => a.kind === 'flight_arrive').map((a) => a.day).sort();
+  const departs = anchors.filter((a) => a.kind === 'flight_depart').map((a) => a.day).sort();
+  const lo = arrives[0];
+  const hi = departs[departs.length - 1];
+  if (lo === undefined && hi === undefined) return days;
+  return days.filter((d) => (lo === undefined || d >= lo) && (hi === undefined || d <= hi));
+}
+
 /** Inclusive day list start..end (capped). */
 export function dayList(start: string, end: string, maxDays = 45): string[] {
   const out: string[] = [];

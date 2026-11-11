@@ -8,3 +8,24 @@
 body {
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
+
+/* Print: hide chrome/controls (data-no-print) and flatten cards for a clean
+   day-by-day readout. Pair with `hidden print:block` for print-only views. */
+@media print {
+  [data-no-print] {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .shadow-sm,
+  .shadow-lg {
+    box-shadow: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+}

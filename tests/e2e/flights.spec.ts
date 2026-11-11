@@ -32,7 +32,7 @@ test('flights: scan, pick pair, returns, shortlist, select, vote, manual', async
 
   await cell.click();
   await expect(page.getByText('Loading…')).toBeHidden({ timeout: 60_000 });
-  await page.getByRole('button', { name: 'Choose return' }).first().click();
+  await page.getByRole('button', { name: 'Select this outbound' }).first().click();
   // Step 2 pins the outbound and swaps in the return list.
   await expect(page.getByText('Your outbound', { exact: true })).toBeVisible();
   await expect(page.getByTestId('outbound-table')).toHaveCount(0);
@@ -42,7 +42,7 @@ test('flights: scan, pick pair, returns, shortlist, select, vote, manual', async
   const returnRows = page.getByTestId('returns-table').locator('tbody tr');
   await expect(returnRows.first()).toBeVisible({ timeout: 60_000 });
 
-  await returnRows.first().getByRole('button', { name: 'Shortlist', exact: true }).click();
+  await returnRows.first().getByRole('button', { name: 'Shortlist this round trip' }).click();
   await expect(page.getByText('Shortlisted flights')).toBeVisible({ timeout: 15_000 });
   await expect(returnRows.first().getByText('Shortlisted')).toBeVisible();
   await expect(page.getByTestId('tab-shortlist-count')).toHaveText('1');
@@ -51,7 +51,7 @@ test('flights: scan, pick pair, returns, shortlist, select, vote, manual', async
   await page.getByRole('button', { name: 'Change outbound' }).click();
   await expect(outboundRows(page).first()).toBeVisible();
 
-  await page.getByRole('button', { name: 'Select' }).first().click();
+  await page.getByRole('button', { name: 'Select', exact: true }).first().click();
   await expect(page.getByText('selected').first()).toBeVisible();
   await expect(page.getByTestId('tab-done-flights')).toBeVisible();
 
@@ -119,7 +119,7 @@ test('flights: switch between date pairs, rapid clicks, error cell', async ({ pa
     await pricedCells.nth(i).click();
     await expect(pricedCells.nth(i)).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByText('Loading…')).toBeHidden({ timeout: 60_000 });
-    await expect(page.getByRole('button', { name: 'Choose return' }).first())
+    await expect(page.getByRole('button', { name: 'Select this outbound' }).first())
       .toBeVisible({ timeout: 30_000 });
   }
 
@@ -127,15 +127,15 @@ test('flights: switch between date pairs, rapid clicks, error cell', async ({ pa
   await pricedCells.nth(0).click();
   await pricedCells.nth(1).click();
   await expect(pricedCells.nth(1)).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('button', { name: 'Choose return' }).first())
+  await expect(page.getByRole('button', { name: 'Select this outbound' }).first())
     .toBeVisible({ timeout: 30_000 });
 
   // Switching pairs while on the return step resets to step 1.
-  await page.getByRole('button', { name: 'Choose return' }).first().click();
+  await page.getByRole('button', { name: 'Select this outbound' }).first().click();
   await expect(page.getByText('Your outbound', { exact: true })).toBeVisible();
   await pricedCells.nth(0).click();
   await expect(page.getByText('Your outbound', { exact: true })).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Choose return' }).first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('button', { name: 'Select this outbound' }).first()).toBeVisible({ timeout: 30_000 });
 
   // A pair whose scan failed shows an error notice on click, not a crash.
   const errCell = page.locator('button', { hasText: 'Failed — retry' }).first();
@@ -144,7 +144,7 @@ test('flights: switch between date pairs, rapid clicks, error cell', async ({ pa
     await expect(page.getByRole('alert')).toBeVisible({ timeout: 30_000 });
     // …and switching back to a good pair recovers cleanly.
     await pricedCells.nth(0).click();
-    await expect(page.getByRole('button', { name: 'Choose return' }).first())
+    await expect(page.getByRole('button', { name: 'Select this outbound' }).first())
       .toBeVisible({ timeout: 30_000 });
   }
 });

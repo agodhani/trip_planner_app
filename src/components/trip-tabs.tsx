@@ -25,7 +25,7 @@ export function TripTabs({ tripId, done = {}, shortlistCount = 0 }: {
   const pathname = usePathname();
   const base = `/trips/${tripId}`;
   return (
-    <nav className="flex gap-1 overflow-x-auto border-b border-neutral-200" aria-label="Trip sections">
+    <nav className="flex gap-1 overflow-x-auto border-b border-neutral-200" aria-label="Trip sections" data-no-print>
       {TABS.map((t) => {
         const href = t.slug ? `${base}/${t.slug}` : base;
         const active =

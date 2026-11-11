@@ -41,7 +41,7 @@ export default async function TripLayout({
             <span className="rounded-full bg-teal-50 px-2.5 py-0.5 text-xs font-medium text-teal-700">
               {STATUS_LABEL[trip.status] ?? trip.status}
             </span>
-            <div className="ml-auto flex -space-x-2">
+            <div className="ml-auto flex -space-x-2" data-no-print>
               {members.map((m) => (
                 <span
                   key={m.userId}

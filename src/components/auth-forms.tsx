@@ -27,8 +27,10 @@ export function SignupForm({ next }: { next?: string }) {
     }
   }, []);
 
+  // suppressHydrationWarning: password managers decorate inputs at runtime,
+  // which otherwise trips a hydration-mismatch warning in dev.
   return (
-    <form action={action} className="flex flex-col gap-4">
+    <form action={action} className="flex flex-col gap-4" suppressHydrationWarning>
       <input type="hidden" name="timezone" ref={tzRef} />
       <input type="hidden" name="next" value={next ?? ''} />
       <div>
@@ -81,7 +83,7 @@ export function LoginForm({ next }: { next?: string }) {
     {},
   );
   return (
-    <form action={action} className="flex flex-col gap-4">
+    <form action={action} className="flex flex-col gap-4" suppressHydrationWarning>
       <input type="hidden" name="next" value={next ?? ''} />
       <div>
         <label htmlFor="email" className={labelCls}>

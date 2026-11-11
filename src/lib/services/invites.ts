@@ -57,7 +57,7 @@ export async function createInvite(
       tripId,
       userId: actor.id,
       verb: 'invite.created',
-      summary: `${actor.name} created a ${role} invite link`,
+      summary: `${actor.name} created ${/^[aeiou]/i.test(role) ? 'an' : 'a'} ${role} invite link`,
       entityType: 'invite',
       entityId: row.id,
     });

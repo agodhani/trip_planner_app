@@ -163,6 +163,7 @@ export type OptionPanelItem = {
   id: string; title: string; subtitle: string | null; status: string;
   price: number | null; currency: string | null; bookingUrl: string | null;
   bookingRef: string | null; source: string; externalId: string | null;
+  kind: string;
   votes: { score: number; voters: { name: string; value: number }[] };
   comments: { id: string; body: string; author: string }[];
 };
@@ -176,7 +177,7 @@ export async function optionPanel(tripId: string, kind: string): Promise<OptionP
     id: o.id, title: o.title, subtitle: o.subtitle, status: o.status,
     price: o.priceAmount ? Number(o.priceAmount) : null, currency: o.priceCurrency,
     bookingUrl: o.bookingUrl, bookingRef: o.bookingRef, source: o.source,
-    externalId: o.externalId,
+    externalId: o.externalId, kind: o.kind,
     votes: votes.get(o.id) ?? { score: 0, voters: [] },
     comments: commentRows
       .filter((c) => c.optionId === o.id)

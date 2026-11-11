@@ -4,10 +4,11 @@ import { db } from '@/lib/db/client';
 import { itineraryItems, transportLegs, tripOptions } from '@/lib/db/schema';
 import { todayISO } from '@/lib/clock';
 import { candidatePairs } from '@/lib/domain/dates/strategy';
-import { autoAssign, dayList, to24h } from '@/lib/domain/itinerary';
+import { arrangeableDays, autoAssign, dayList, orderDay, to24h } from '@/lib/domain/itinerary';
 import { hoursWarning } from '@/lib/domain/opening-hours';
 import { env } from '@/lib/env';
 import { dayLabel } from '@/lib/ui-format';
+import { ForbiddenError } from '@/lib/auth/guards';
 import { assertTripRole, NotFoundError } from './access';
 import { recordEvent, type Tx } from './events';
 import { getTrip } from './trips';
@@ -119,13 +120,20 @@ export async function syncAnchors(user: { id: string; name: string }, tripId: st
       const key = (it.location as { anchorKey?: string } | null)?.anchorKey;
       if (key) have.set(key, it);
     }
+    let changed = 0;
     for (const s of specs) {
       const cur = have.get(s.anchorKey);
       if (cur) {
-        await tx.update(itineraryItems).set({
-          day: s.day, startTime: s.time ?? null, title: s.title,
-          location: { lat: s.lat ?? null, lon: s.lon ?? null, anchorKey: s.anchorKey },
-        }).where(eq(itineraryItems.id, cur.id));
+        const loc = cur.location as { lat?: number | null; lon?: number | null } | null;
+        const dirty = cur.day !== s.day || (cur.startTime ?? null) !== (s.time ?? null)
+          || cur.title !== s.title || (loc?.lat ?? null) !== (s.lat ?? null) || (loc?.lon ?? null) !== (s.lon ?? null);
+        if (dirty) {
+          await tx.update(itineraryItems).set({
+            day: s.day, startTime: s.time ?? null, title: s.title,
+            location: { lat: s.lat ?? null, lon: s.lon ?? null, anchorKey: s.anchorKey },
+          }).where(eq(itineraryItems.id, cur.id));
+          changed += 1;
+        }
       } else {
         await tx.insert(itineraryItems).values({
           tripId, day: s.day, startTime: s.time ?? null, kind: s.kind,
@@ -134,18 +142,23 @@ export async function syncAnchors(user: { id: string; name: string }, tripId: st
           system: true, locked: true, sortOrder: s.kind === 'flight_depart' ? 0 : s.kind === 'checkin' ? 50 : s.kind === 'checkout' ? 0 : 90,
           createdBy: user.id,
         });
+        changed += 1;
       }
     }
     for (const it of existing) {
       const key = (it.location as { anchorKey?: string } | null)?.anchorKey;
       if (key && !wanted.has(key)) {
         await tx.delete(itineraryItems).where(eq(itineraryItems.id, it.id));
+        changed += 1;
       }
     }
-    await recordEvent(tx, {
-      tripId, userId: user.id, verb: 'itinerary.anchors_synced',
-      summary: `${user.name} synced itinerary anchors (${specs.length})`, entityType: 'trip', entityId: tripId,
-    });
+    // No-op syncs stay silent — the feed only hears about real changes.
+    if (changed > 0) {
+      await recordEvent(tx, {
+        tripId, userId: user.id, verb: 'itinerary.anchors_synced',
+        summary: `${user.name} synced itinerary anchors (${specs.length})`, entityType: 'trip', entityId: tripId,
+      });
+    }
   });
   return specs.length;
 }
@@ -157,6 +170,7 @@ export async function addItem(
     title: string; day?: string | null; optionId?: string | null;
     lat?: number | null; lon?: number | null; notes?: string | null;
     plannedCost?: number | null; plannedCurrency?: string | null;
+    startTime?: string | null; endTime?: string | null; locked?: boolean;
   },
 ) {
   await assertTripRole(tripId, user.id, 'editor');
@@ -171,6 +185,8 @@ export async function addItem(
       notes: input.notes ?? null,
       plannedCost: input.plannedCost != null ? String(input.plannedCost) : null,
       plannedCurrency: input.plannedCurrency ?? null,
+      startTime: input.startTime ?? null, endTime: input.endTime ?? null,
+      locked: input.locked ?? false,
       unplanned: !input.day, sortOrder: sort, createdBy: user.id,
     }).returning();
     await recordEvent(tx, {
@@ -201,6 +217,58 @@ export async function moveItem(
     await recordEvent(tx, {
       tripId, userId: user.id, verb: 'itinerary.item_moved',
       summary: `${user.name} moved ${cur[0].title}${unplanned ? ' to unscheduled' : ` to ${dayLabel(target.day!)}`}`,
+      entityType: 'itinerary_item', entityId: itemId,
+    });
+  });
+}
+
+/**
+ * Board drop: place an item at an exact (day, startTime, sortOrder) computed
+ * by computeDrop(), then renumber the day's non-anchor items to orderDay
+ * order in ×10 steps so every view agrees.
+ */
+export async function placeItem(
+  user: { id: string; name: string }, tripId: string, itemId: string,
+  target: { day: string | null; startTime: string | null; sortOrder: number; siblings?: { id: string; sortOrder: number }[] },
+) {
+  await assertTripRole(tripId, user.id, 'editor');
+  const trip = await getTrip(tripId);
+  if (!trip) throw new NotFoundError();
+  const days = tripDays(trip)?.days ?? [];
+  await db.transaction(async (tx) => {
+    const cur = await tx.select().from(itineraryItems)
+      .where(and(eq(itineraryItems.id, itemId), eq(itineraryItems.tripId, tripId))).limit(1);
+    if (!cur[0]) throw new NotFoundError('Item not found');
+    if (cur[0].system) throw new ForbiddenError('Anchors are fixed — they follow your flight/stay');
+
+    for (const s of target.siblings ?? []) {
+      await tx.update(itineraryItems).set({ sortOrder: s.sortOrder })
+        .where(and(eq(itineraryItems.id, s.id), eq(itineraryItems.tripId, tripId), eq(itineraryItems.system, false)));
+    }
+    const unplanned = target.day === null;
+    await tx.update(itineraryItems).set({
+      day: target.day, unplanned,
+      startTime: target.startTime, sortOrder: Math.round(target.sortOrder),
+      updatedAt: new Date(),
+    }).where(eq(itineraryItems.id, itemId));
+
+    // Renumber the target column's non-anchor items to orderDay order (×10).
+    const dayItems = (await tx.select().from(itineraryItems)
+      .where(and(eq(itineraryItems.tripId, tripId), target.day ? eq(itineraryItems.day, target.day) : eq(itineraryItems.unplanned, true))))
+      .filter((i) => !i.system);
+    const ordered = orderDay(dayItems);
+    for (let i = 0; i < ordered.length; i++) {
+      const want = (i + 1) * 10;
+      if (ordered[i].sortOrder !== want) {
+        await tx.update(itineraryItems).set({ sortOrder: want }).where(eq(itineraryItems.id, ordered[i].id));
+      }
+    }
+
+    const di = target.day ? days.indexOf(target.day) : -1;
+    const where = unplanned ? 'unscheduled' : di >= 0 ? `Day ${di + 1}` : dayLabel(target.day!);
+    await recordEvent(tx, {
+      tripId, userId: user.id, verb: 'itinerary.item_moved',
+      summary: `${user.name} moved ${cur[0].title} to ${where}`,
       entityType: 'itinerary_item', entityId: itemId,
     });
   });
@@ -262,6 +330,10 @@ export async function autoArrange(user: { id: string; name: string }, tripId: st
   if (!free.length) return { assigned: 0 };
 
   const locOf = (i: ItemRow) => (i.location as { lat?: number; lon?: number } | null);
+  // Destination activities only run between arrival and departure days.
+  const specs = await anchorSpecs(trip);
+  const allowed = arrangeableDays(range.days, specs);
+  if (!allowed.length) return { assigned: 0 };
   // Google Maps hours on the shortlisted option tell us which days to avoid.
   const hoursByOption = new Map<string, unknown>();
   const optIds = free.map((i) => i.optionId).filter((x): x is string => !!x);
@@ -271,19 +343,19 @@ export async function autoArrange(user: { id: string; name: string }, tripId: st
     for (const o of opts) hoursByOption.set(o.id, (o.data as { hours?: unknown }).hours);
   }
   const anchorByDay = new Map<string, { lat: number; lon: number } | null>();
-  for (const d of range.days) {
+  for (const d of allowed) {
     const stay = items.find((i) => i.system && i.day === d && (i.kind === 'checkin' || i.kind === 'checkout') && locOf(i)?.lat != null);
     const st = stay ? locOf(stay) : null;
     anchorByDay.set(d, st && st.lat != null && st.lon != null ? { lat: st.lat, lon: st.lon } : { lat: trip.destination.lat, lon: trip.destination.lon });
   }
-  const perDay = Math.max(2, Math.ceil(free.length / Math.max(1, range.days.length)));
+  const perDay = Math.max(2, Math.ceil(free.length / Math.max(1, allowed.length)));
   const plan = autoAssign(
-    range.days.map((d) => ({ day: d, anchor: anchorByDay.get(d) ?? null, capacity: perDay })),
+    allowed.map((d) => ({ day: d, anchor: anchorByDay.get(d) ?? null, capacity: perDay })),
     free.map((i) => {
       const hours = i.optionId ? hoursByOption.get(i.optionId) : undefined;
       const avoidDays = hours === undefined
         ? undefined
-        : range.days.filter((d) => hoursWarning(hours, d)?.kind === 'closed');
+        : allowed.filter((d) => hoursWarning(hours, d)?.kind === 'closed');
       return {
         id: i.id, lat: locOf(i)?.lat ?? null, lon: locOf(i)?.lon ?? null,
         avoidDays: avoidDays?.length ? avoidDays : undefined,
@@ -292,7 +364,7 @@ export async function autoArrange(user: { id: string; name: string }, tripId: st
   );
 
   await db.transaction(async (tx) => {
-    for (const d of range.days) {
+    for (const d of allowed) {
       const ids = plan.get(d) ?? [];
       for (let i = 0; i < ids.length; i++) {
         await tx.update(itineraryItems).set({
@@ -302,7 +374,7 @@ export async function autoArrange(user: { id: string; name: string }, tripId: st
     }
     await recordEvent(tx, {
       tripId, userId: user.id, verb: 'itinerary.auto_arranged',
-      summary: `${user.name} auto-arranged ${free.length} activities across ${range.days.length} days`,
+      summary: `${user.name} auto-arranged ${free.length} activities across ${allowed.length} days`,
       entityType: 'trip', entityId: tripId,
     });
   });

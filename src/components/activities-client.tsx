@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useActionState, useMemo, useState } from 'react';
+import { useActionState, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ExternalLink, Loader2, Map as MapIcon, MapPin, Search, Star } from 'lucide-react';
 import { shortlistOptionAction } from '@/lib/actions/options';
 import type { ActionState } from '@/lib/actions/people';
@@ -10,6 +10,7 @@ import { weekSummary } from '@/lib/domain/opening-hours';
 import type { PlaceResult } from '@/lib/providers/types';
 import { OptionMap, type MapPoint } from '@/components/option-map';
 import { HiddenIds, ShortlistedOptions, ui, type ShortlistedOption } from '@/components/shortlisted-options';
+import { formKey, readResults, resultsKey, writeResults } from '@/lib/results-cache';
 import { SubmitButton } from '@/components/submit-button';
 import { Thumb } from '@/components/thumb';
 import { plural } from '@/lib/ui-format';
@@ -185,6 +186,28 @@ export function ActivitiesClient({
   }, [nearKey, pin, centers]);
   const nearLabel = nearKey === 'pin' ? 'your pin' : centers.find((c) => c.key === nearKey)?.label ?? 'centre';
 
+  const restored = useRef(false);
+  const applyHit = (form: { query: string; nearKey: string }, hit: { places: PlaceResult[] }) => {
+    setQuery(form.query);
+    if (form.nearKey !== 'pin') setNearKey(form.nearKey);
+    setResults(hit.places);
+  };
+  // Restore the last search (form + results) on mount; only successes persist.
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    const form = readResults<{ query: string; nearKey: string }>(formKey(tripId, 'activity'));
+    if (!form?.query) return;
+    const point = centers.find((c) => c.key === form.nearKey)?.point ?? centers[0]?.point;
+    const p = new URLSearchParams({ q: form.query });
+    if (point) { p.set('lat', String(point.lat)); p.set('lon', String(point.lon)); }
+    const hit = readResults<{ places: PlaceResult[] }>(resultsKey(tripId, 'activity', p.toString()));
+    // sessionStorage is an external system — mirroring it into state is the
+    // point of this effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (hit) applyHit(form, hit);
+  }, [tripId, centers]);
+
   async function search(q: string, category?: string) {
     const text = q.trim();
     if (!text) return;
@@ -196,7 +219,10 @@ export function ActivitiesClient({
       const res = await fetch(`/api/trips/${tripId}/activities?${p}`);
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? { kind: 'error', message: 'Search failed' }); return; }
-      setResults(data.places ?? []);
+      const places = (data.places ?? []) as PlaceResult[];
+      setResults(places);
+      writeResults(resultsKey(tripId, 'activity', p.toString()), { places });
+      writeResults(formKey(tripId, 'activity'), { query: text, nearKey });
     } catch {
       setError({ kind: 'network', message: 'Request failed' });
     } finally {
@@ -294,10 +320,13 @@ export function ActivitiesClient({
               <option value="pin">Dropped pin</option>
             </select>
           </label>
-          <button type="submit" disabled={!configured || loading || !query.trim()} className={`${btn} inline-flex items-center gap-1.5`}>
-            {loading ? <Loader2 aria-hidden className="h-4 w-4 animate-spin" /> : <Search aria-hidden className="h-4 w-4" />}
-            Search
-          </button>
+          <span className="flex flex-col gap-0.5">
+            <button type="submit" disabled={!configured || loading || !query.trim()} className={`${btn} inline-flex items-center gap-1.5`}>
+              {loading ? <Loader2 aria-hidden className="h-4 w-4 animate-spin" /> : <Search aria-hidden className="h-4 w-4" />}
+              Search
+            </button>
+            {configured && !query.trim() && <span className="text-xs text-neutral-400">Type a search first</span>}
+          </span>
           {canEdit && <button type="button" className={btn2} onClick={() => setManualOpen((v) => !v)} aria-expanded={manualOpen}>Add manually</button>}
         </form>
         <p className="mt-2 text-xs text-neutral-500">

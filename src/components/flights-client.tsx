@@ -193,7 +193,7 @@ function FlightTable({
                 <td className="px-3 py-2.5">
                   <span className="flex items-center justify-end gap-1.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                     {onChooseReturn && (
-                      <button type="button" className={btnSm} onClick={() => onChooseReturn(it)}>Choose return</button>
+                      <button type="button" className={btnSm} onClick={() => onChooseReturn(it)}>Select this outbound</button>
                     )}
                     {canEdit && (saved ? (
                       <span className="inline-flex items-center gap-1 rounded-md bg-teal-50 px-2 py-1 text-xs font-medium text-teal-700">
@@ -201,7 +201,7 @@ function FlightTable({
                       </span>
                     ) : (
                       <button type="button" className={btn2} disabled={isPending(key)} onClick={() => onShortlist(it)}>
-                        {isPending(key) && <Loader2 aria-hidden className="h-3 w-3 animate-spin" />}Shortlist
+                        {isPending(key) && <Loader2 aria-hidden className="h-3 w-3 animate-spin" />}{mode === 'return' ? 'Shortlist this round trip' : 'Shortlist'}
                       </button>
                     ))}
                     {it.bookingUrl && (

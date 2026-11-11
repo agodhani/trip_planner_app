@@ -6,7 +6,7 @@ import { formFields } from '@/lib/form-data';
 import { requireTripRole } from '@/lib/auth/guards';
 import { NotFoundError } from '@/lib/services/access';
 import {
-  addItem, autoArrange, deleteItem, moveItem, syncAnchors, updateItem,
+  addItem, autoArrange, deleteItem, moveItem, placeItem, syncAnchors, updateItem,
 } from '@/lib/services/itinerary';
 import { addManualLeg, chooseLeg, computeLegs } from '@/lib/services/transport';
 import type { ActionState } from './people';
@@ -21,6 +21,8 @@ export async function syncAnchorsAction(formData: FormData): Promise<void> {
   ok(tripId);
 }
 
+const timeRe = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
+
 const itemSchema = z.object({
   kind: z.enum(['activity', 'meal', 'transport', 'custom']),
   title: z.string().min(1).max(200),
@@ -30,6 +32,10 @@ const itemSchema = z.object({
   lon: z.coerce.number().optional(),
   notes: z.string().max(1000).optional(),
   plannedCost: z.coerce.number().nonnegative().optional(),
+  plannedCurrency: z.string().regex(/^[A-Z]{3}$/).optional(),
+  startTime: z.string().regex(timeRe).optional().or(z.literal('')),
+  endTime: z.string().regex(timeRe).optional().or(z.literal('')),
+  locked: z.enum(['1']).optional(),
 });
 
 export async function addItemAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -42,7 +48,9 @@ export async function addItemAction(_prev: ActionState, formData: FormData): Pro
     kind: d.kind, title: d.title,
     day: d.day || null, optionId: d.optionId || null,
     lat: d.lat ?? null, lon: d.lon ?? null, notes: d.notes || null,
-    plannedCost: d.plannedCost ?? null,
+    plannedCost: d.plannedCost ?? null, plannedCurrency: d.plannedCurrency || null,
+    startTime: d.startTime || null, endTime: d.endTime || null,
+    locked: d.locked === '1',
   });
   ok(tripId);
   return {};
@@ -57,6 +65,28 @@ export async function moveItemAction(formData: FormData): Promise<void> {
   await moveItem(user, tripId, itemId, {
     day: day === 'pool' || day === null || day === '' ? null : String(day),
     sortOrder: sortOrder ? Number(sortOrder) : undefined,
+  });
+  ok(tripId);
+}
+
+/** Board drag-and-drop: exact (day, startTime, sortOrder) from computeDrop. */
+export async function placeItemAction(formData: FormData): Promise<void> {
+  const tripId = tid(formData);
+  const itemId = z.string().uuid().parse(formData.get('itemId'));
+  const day = String(formData.get('day') ?? '');
+  const startTime = String(formData.get('startTime') ?? '');
+  const sortOrder = z.coerce.number().parse(formData.get('sortOrder') ?? 0);
+  const { user } = await requireTripRole(tripId, 'editor');
+  let siblings: { id: string; sortOrder: number }[] | undefined;
+  const rawSiblings = String(formData.get('siblings') ?? '');
+  if (rawSiblings) {
+    const parsed = z.array(z.object({ id: z.string().uuid(), sortOrder: z.number() })).safeParse(JSON.parse(rawSiblings));
+    if (parsed.success) siblings = parsed.data;
+  }
+  await placeItem(user, tripId, itemId, {
+    day: day === 'pool' || day === '' ? null : day,
+    startTime: timeRe.test(startTime) ? startTime : null,
+    sortOrder, siblings,
   });
   ok(tripId);
 }

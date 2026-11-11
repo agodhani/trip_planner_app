@@ -13,6 +13,7 @@ export type ShortlistedOption = {
   id: string; title: string; subtitle: string | null; status: string;
   price: number | null; currency: string | null; bookingUrl: string | null;
   bookingRef: string | null; source: string; externalId?: string | null;
+  kind?: string;
   votes: { score: number; voters: { name: string; value: number }[] };
   comments: { id: string; body: string; author: string }[];
 };
@@ -103,7 +104,7 @@ export function ShortlistedOptions({
                   )}
                   {o.bookingUrl && (
                     <a href={o.bookingUrl} target="_blank" rel="noopener noreferrer" className={`${btn2} inline-flex items-center gap-1`}>
-                      Book <ExternalLink aria-hidden className="h-3 w-3" />
+                      {o.kind === 'activity' ? 'Website' : 'Book'} <ExternalLink aria-hidden className="h-3 w-3" />
                     </a>
                   )}
                   {canEdit && (

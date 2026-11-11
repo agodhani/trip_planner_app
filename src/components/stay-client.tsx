@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useActionState, useMemo, useState } from 'react';
+import { useActionState, useEffect, useMemo, useRef, useState } from 'react';
 import { BedDouble, Check, ExternalLink, Info, Loader2, Map as MapIcon, Star } from 'lucide-react';
 import { shortlistOptionAction } from '@/lib/actions/options';
 import type { ActionState } from '@/lib/actions/people';
@@ -11,6 +11,7 @@ import type { LodgingResult } from '@/lib/providers/types';
 import { AMENITY_IDS, NON_HOSTEL_TYPE_IDS, PROPERTY_TYPES, HOTEL_RATING } from '@/lib/providers/serpapi/hotel-filters';
 import { OptionMap, type MapPoint } from '@/components/option-map';
 import { HiddenIds, ShortlistedOptions, ui, type ShortlistedOption } from '@/components/shortlisted-options';
+import { readResults, resultsKey, writeResults } from '@/lib/results-cache';
 import { SubmitButton } from '@/components/submit-button';
 import { Thumb } from '@/components/thumb';
 import { dayLabel, money, nightsBetween, plural } from '@/lib/ui-format';
@@ -261,15 +262,37 @@ export function StayClient({
   const paramString = params.toString();
   const filtersChanged = results !== null && searched !== null && searched.params !== paramString;
 
+  // Restore a stored result when the form state matches its params (e.g. after
+  // navigating away and back). Errors were never written, only successes.
+  const restoredFor = useRef<string | null>(null);
+  const applyHit = (hit: { lodgings: LodgingResult[]; ads: LodgingResult[] }) => {
+    setRaw(hit.lodgings);
+    setAds(hit.ads);
+    setSearched({ checkIn, checkOut, params: paramString });
+  };
+  useEffect(() => {
+    if (searched?.params === paramString || restoredFor.current === paramString) return;
+    const hit = readResults<{ lodgings: LodgingResult[]; ads: LodgingResult[] }>(resultsKey(tripId, 'lodging', paramString));
+    restoredFor.current = paramString;
+    // sessionStorage is an external system — mirroring it into state is the
+    // point of this effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (hit) applyHit(hit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paramString, searched, tripId]);
+
   async function search() {
     setLoading(true); setError(null);
     try {
       const res = await fetch(`/api/trips/${tripId}/stay?${paramString}`);
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? { kind: 'error', message: 'Search failed' }); return; }
-      setRaw(data.lodgings ?? []);
-      setAds(data.ads ?? []);
+      const lodgings = (data.lodgings ?? []) as LodgingResult[];
+      const sponsored = (data.ads ?? []) as LodgingResult[];
+      setRaw(lodgings);
+      setAds(sponsored);
       setSearched({ checkIn, checkOut, params: paramString });
+      writeResults(resultsKey(tripId, 'lodging', paramString), { lodgings, ads: sponsored });
     } catch {
       setError({ kind: 'network', message: 'Request failed' });
     } finally {
@@ -397,6 +420,7 @@ export function StayClient({
 
         <div className="mt-3">
           <p className="mb-1 text-xs font-medium text-neutral-600">Must-haves</p>
+          <p className="mb-1.5 text-xs text-neutral-400">Star chips filter by exact hotel class — 4-star shows only stays classed 4-star, not 4+.</p>
           <div className="flex flex-wrap gap-1.5">
             {[2, 3, 4, 5].map((c) => (
               <button key={c} type="button" aria-pressed={classes.has(c)} className={chip(classes.has(c))} onClick={() => toggle(setClasses, c)}>{c}-star</button>

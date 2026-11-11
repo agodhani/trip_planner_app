@@ -4,7 +4,7 @@ import type { SessionUser } from '@/lib/auth/session';
 
 export function AppNav({ user }: { user: SessionUser }) {
   return (
-    <header className="border-b border-neutral-200 bg-white">
+    <header className="border-b border-neutral-200 bg-white" data-no-print>
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
         <Link href="/trips" className="text-lg font-bold text-teal-700">
           TripPlanner

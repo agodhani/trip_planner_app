@@ -18,17 +18,17 @@ test('transport: compute routes between items, choose leg, manual leg', async ({
 
   // Itinerary: first one goes in Unscheduled, then onto day 1; second straight to day 1.
   await page.getByRole('link', { name: 'Itinerary', exact: true }).click();
-  const pool = page.locator('section', { hasText: 'Shortlisted activities' });
-  await expect(pool.locator('li')).toHaveCount(2, { timeout: 15_000 });
-  await pool.locator('li').first().getByRole('button', { name: 'Add' }).click();
-  const unscheduled = page.locator('section', { has: page.getByRole('heading', { name: 'Unscheduled' }) });
+  const unscheduled = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Unscheduled' }) });
+  const poolCards = unscheduled.locator('li', { has: page.getByRole('button', { name: 'Add' }) });
+  await expect(poolCards).toHaveCount(2, { timeout: 15_000 });
+  await poolCards.first().getByRole('button', { name: 'Add' }).click();
   await expect(unscheduled.getByLabel('Move to day')).toHaveCount(1, { timeout: 15_000 });
   await unscheduled.getByLabel('Move to day').selectOption({ index: 1 });
-  await expect(unscheduled.getByText('Nothing unscheduled.')).toBeVisible({ timeout: 15_000 });
-  await expect(pool.locator('li')).toHaveCount(1);
-  await pool.locator('li').first().locator('select[name="day"]').selectOption({ index: 1 });
-  await pool.locator('li').first().getByRole('button', { name: 'Add' }).click();
-  await expect(page.getByText('Shortlisted activities')).toHaveCount(0, { timeout: 15_000 });
+  await expect(unscheduled.getByLabel('Move to day')).toHaveCount(0, { timeout: 15_000 });
+  await expect(poolCards).toHaveCount(1);
+  await poolCards.first().locator('select[name="day"]').selectOption({ index: 1 });
+  await poolCards.first().getByRole('button', { name: 'Add' }).click();
+  await expect(poolCards).toHaveCount(0, { timeout: 15_000 });
 
   // Compute routes → walk/drive/transit legs via OSRM/FOSSGIS/Transitous fixtures.
   await page.getByRole('link', { name: 'Getting around', exact: true }).click();
