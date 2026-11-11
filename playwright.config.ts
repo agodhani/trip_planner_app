@@ -19,6 +19,8 @@ export default defineConfig({
       APP_URL: 'http://localhost:3100',
       PROVIDER_FIXTURES_DIR: 'tests/fixtures',
       TP_TEST_NOW: '2026-10-30T12:00:00Z',
+      // 1s pulse cadence so toasts/dots/presence land inside expect timeouts.
+      NEXT_PUBLIC_PULSE_MS: '1000',
     },
   },
 });

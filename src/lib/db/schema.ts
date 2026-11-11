@@ -185,6 +185,9 @@ export const tripMembers = pgTable(
     joinedAt: timestamp('joined_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
+    // Presence heartbeat: written at most once per user per minute by the
+    // trip pulse action.
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
   },
   (t) => [primaryKey({ columns: [t.tripId, t.userId] })],
 );

@@ -23,7 +23,7 @@ import type { ActionState } from '@/lib/actions/people';
 import { DayMap } from '@/components/day-map';
 import { ui, HiddenIds } from '@/components/shortlisted-options';
 import { SubmitButton } from '@/components/submit-button';
-import { ToastProvider, useToast } from '@/components/toaster';
+import { useToast } from '@/components/toaster';
 import { dayTiming } from '@/lib/domain/day-timing';
 import { computeDrop, orderDay, type DropResult } from '@/lib/domain/itinerary';
 import { dayLabel, money, plural } from '@/lib/ui-format';
@@ -630,10 +630,8 @@ function ItineraryBoard({ tripId, canEdit, days, items, legs, pool, currency }: 
   );
 }
 
+// The ToastProvider lives at the trip layout level (TripPulse) so pulse
+// toasts and board toasts share one stack.
 export function ItineraryClient(props: Parameters<typeof ItineraryBoard>[0]) {
-  return (
-    <ToastProvider>
-      <ItineraryBoard {...props} />
-    </ToastProvider>
-  );
+  return <ItineraryBoard {...props} />;
 }
