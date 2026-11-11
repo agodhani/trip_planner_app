@@ -13,7 +13,7 @@ export default async function globalSetup() {
       activity_events, comments, date_pair_prefs, expense_shares, expenses, flight_searches,
       itinerary_items, option_votes, provider_cache, provider_calls,
       sessions, share_links, transport_legs, travelers, trip_invites,
-      trip_members, trip_options, trips, users
+      trip_members, trip_options, trip_tasks, trips, users
     CASCADE
   `;
   await sql.end();

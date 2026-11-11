@@ -72,36 +72,33 @@ test('date pair availability: marks, honest counts, best-for-group, warning, pul
   // pulse toast rather than an in-place refresh.
   await owner.getByRole('link', { name: 'Overview', exact: true }).click();
 
-  try {
-    // Member sees the finished scan and the owner's mark, then marks the
-    // second priced pair Can't.
-    await member.getByRole('link', { name: 'Flights', exact: true }).click();
-    await expect(prefGroup(member, 0)).toBeVisible({ timeout: 30_000 });
-    await expect(prefCard(member, 0)).toContainText('1 works — of 2 members');
-    await prefGroup(member, 1).getByRole('button', { name: 'Can’t' }).click();
-    await expect(
-      prefGroup(member, 1).getByRole('button', { name: 'Can’t' }),
-    ).toHaveAttribute('aria-pressed', 'true');
-    await expect(prefCard(member, 1)).toContainText("1 can't — of 2 members");
+  // Member sees the finished scan and the owner's mark, then marks the
+  // second priced pair Can't.
+  await member.getByRole('link', { name: 'Flights', exact: true }).click();
+  await expect(prefGroup(member, 0)).toBeVisible({ timeout: 30_000 });
+  await expect(prefCard(member, 0)).toContainText('1 works — of 2 members');
+  await prefGroup(member, 1).getByRole('button', { name: 'Can’t' }).click();
+  await expect(
+    prefGroup(member, 1).getByRole('button', { name: 'Can’t' }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(prefCard(member, 1)).toContainText("1 can't — of 2 members");
 
-    // Member's grid agrees: the works-marked pair carries the badge.
-    await expect(
-      prefCard(member, 0).getByTestId('best-for-group'),
-    ).toBeVisible();
-    await expect(prefCard(member, 1).getByTestId('best-for-group')).toHaveCount(0);
-  } finally {
-    // The member's writes already committed — closing is safe.
-    await ctx.close();
-  }
-
+  // Member's grid agrees: the works-marked pair carries the badge.
+  await expect(
+    prefCard(member, 0).getByTestId('best-for-group'),
+  ).toBeVisible();
+  await expect(prefCard(member, 1).getByTestId('best-for-group')).toHaveCount(0);
   // The member's 'dates.pref_set' event surfaces as a toast pointing at
-  // Flights — the pair grid is where availability lives.
+  // Flights — the pair grid is where availability lives. Keep the member
+  // context open until the toast arrives: the pressed state is optimistic,
+  // so closing early can abort the action mid-flight and no event commits.
   const toast = owner
     .locator('[role="status"]')
     .filter({ hasText: 'marked' })
     .filter({ hasText: 'Flights' })
     .last();
   await expect(toast).toBeVisible({ timeout: 15_000 });
+  await ctx.close();
   await toast.getByRole('button', { name: 'View' }).click();
   await expect(owner).toHaveURL(/\/trips\/[0-9a-f-]{36}\/flights$/);
 

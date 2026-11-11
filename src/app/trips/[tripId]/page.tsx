@@ -1,14 +1,18 @@
 import Link from 'next/link';
 import { ArrowRight, CheckCircle2, Circle, CircleDot } from 'lucide-react';
 import { CommentForm } from '@/components/comment-form';
+import { TripTasks } from '@/components/trip-tasks';
 import { requireTripRole } from '@/lib/auth/guards';
 import { todayISO } from '@/lib/clock';
 import type { StepKey, StepState } from '@/lib/domain/progress';
+import { canMutateTasks, canToggleTask } from '@/lib/domain/tasks';
 import { safeZone, tripLive, tripPhase } from '@/lib/domain/today';
 import { formatDateTime } from '@/lib/format';
 import { listActivity, listTripComments } from '@/lib/services/comments';
 import { tripDays } from '@/lib/services/itinerary';
 import { tripProgress } from '@/lib/services/progress';
+import { listTasks } from '@/lib/services/tasks';
+import { listTravelers } from '@/lib/services/travelers';
 import { getTrip } from '@/lib/services/trips';
 import { notFound } from 'next/navigation';
 
@@ -33,22 +37,30 @@ export default async function TripOverviewPage({
   params: Promise<{ tripId: string }>;
 }) {
   const { tripId } = await params;
-  const { user } = await requireTripRole(tripId, 'viewer');
+  const { user, role } = await requireTripRole(tripId, 'viewer');
   const trip = await getTrip(tripId);
   if (!trip) notFound();
-  const [comments, activity, progress] = await Promise.all([
+  const [comments, activity, progress, tasks, travelers] = await Promise.all([
     listTripComments(tripId),
     listActivity(tripId),
     tripProgress(trip),
+    listTasks(tripId),
+    listTravelers(tripId),
   ]);
   const next = progress.next ? progress.steps.find((s) => s.key === progress.next)! : null;
   const doneCount = progress.steps.filter((s) => s.state === 'done').length;
-  // Same window as the Today tab: destination-local today inside the trip
-  // window, or a trip marked in_progress.
-  const live = tripLive(
-    trip.status,
-    tripPhase(tripDays(trip), todayISO(safeZone(trip.destination.timezone))),
-  );
+  // Destination-local today feeds both the "trip is live" banner and the
+  // task due badges — one pinnable clock value, two consumers.
+  const zone = safeZone(trip.destination.timezone);
+  const destToday = todayISO(zone);
+  const live = tripLive(trip.status, tripPhase(tripDays(trip), destToday));
+  const taskViews = tasks.map((t) => ({
+    ...t,
+    canToggle: canToggleTask(role, t.assigneeUserId, user.id),
+  }));
+  const mineOpen = tasks.filter(
+    (t) => !t.done && t.assigneeUserId === user.id,
+  ).length;
 
   return (
     // minmax(0,…) caps tracks at the container width — a plain `1fr`/`auto`
@@ -114,6 +126,15 @@ export default async function TripOverviewPage({
             ))}
           </ol>
         </section>
+
+        <TripTasks
+          tripId={tripId}
+          canEdit={canMutateTasks(role)}
+          tasks={taskViews}
+          travelers={travelers.map((t) => ({ id: t.id, name: t.displayName }))}
+          today={destToday}
+          mineOpen={mineOpen}
+        />
 
         <section className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
           <h2 className="mb-1 font-semibold">Discussion</h2>

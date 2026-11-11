@@ -551,6 +551,42 @@ export const datePairPrefs = pgTable(
   ],
 );
 
+/**
+ * Group-assigned trip tasks ("Who's on it") — distinct from the derived
+ * planning checklist. Assignee points at a travelers row so non-member
+ * travelers can hold tasks; SET NULL keeps the task when a traveler is
+ * removed. doneAt/doneBy record who closed it for the activity feed.
+ */
+export const tripTasks = pgTable(
+  'trip_tasks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tripId: uuid('trip_id')
+      .notNull()
+      .references(() => trips.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    details: text('details'),
+    assigneeTravelerId: uuid('assignee_traveler_id').references(
+      () => travelers.id,
+      { onDelete: 'set null' },
+    ),
+    dueOn: date('due_on'),
+    done: boolean('done').notNull().default(false),
+    doneAt: timestamp('done_at', { withTimezone: true }),
+    doneBy: uuid('done_by').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index('trip_tasks_trip_idx').on(t.tripId, t.sortOrder)],
+);
+
 export const journalEntries = pgTable('journal_entries', {
   id: uuid('id').primaryKey().defaultRandom(),
   tripId: uuid('trip_id')
