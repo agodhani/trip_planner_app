@@ -15,6 +15,13 @@
       "when": 1794363976000,
       "tag": "0001_cloudy_zarda",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794368157957,
+      "tag": "0002_cynical_ronan",
+      "breakpoints": true
     }
   ]
 }

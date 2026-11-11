@@ -12,8 +12,8 @@ export default async function globalSetup() {
     TRUNCATE TABLE
       activity_events, comments, expense_shares, expenses, flight_searches,
       itinerary_items, option_votes, provider_cache, provider_calls,
-      sessions, transport_legs, travelers, trip_invites, trip_members,
-      trip_options, trips, users
+      sessions, share_links, transport_legs, travelers, trip_invites,
+      trip_members, trip_options, trips, users
     CASCADE
   `;
   await sql.end();

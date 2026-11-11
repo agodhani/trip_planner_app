@@ -19,7 +19,7 @@ const btnCls =
 const smallBtnCls =
   'rounded-md border border-neutral-300 px-2.5 py-1 text-xs text-neutral-700 hover:bg-neutral-100';
 
-export function CopyButton({ text }: { text: string }) {
+export function CopyButton({ text, label = 'Copy invite link' }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button
@@ -30,7 +30,7 @@ export function CopyButton({ text }: { text: string }) {
         setTimeout(() => setCopied(false), 1500);
       }}
       className={smallBtnCls}
-      aria-label="Copy invite link"
+      aria-label={label}
     >
       {copied ? (
         <Check className="inline h-3.5 w-3.5" />

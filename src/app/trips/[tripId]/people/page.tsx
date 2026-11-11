@@ -5,10 +5,15 @@ import {
   RenameTravelerForm,
   RevokeInviteButton,
 } from '@/components/people-controls';
+import {
+  RevokeShareLinkButton,
+  ShareLinkCreateForm,
+} from '@/components/share-controls';
 import { requireTripRole } from '@/lib/auth/guards';
 import { formatDate } from '@/lib/format';
 import { listInvites } from '@/lib/services/invites';
 import { listMembers } from '@/lib/services/members';
+import { listShareLinks } from '@/lib/services/share';
 import { listTravelers } from '@/lib/services/travelers';
 
 const cardCls = 'rounded-xl border border-neutral-200 bg-white p-5 shadow-sm';
@@ -21,10 +26,11 @@ export default async function PeoplePage({
   const { tripId } = await params;
   const { user, role } = await requireTripRole(tripId, 'viewer');
   const isOwner = role === 'owner';
-  const [members, travelers, invites] = await Promise.all([
+  const [members, travelers, invites, shareLinks] = await Promise.all([
     listMembers(tripId),
     listTravelers(tripId),
     isOwner ? listInvites(tripId) : Promise.resolve([]),
+    isOwner ? listShareLinks(tripId) : Promise.resolve([]),
   ]);
 
   const memberNames = new Map(members.map((m) => [m.userId, m.name]));
@@ -97,6 +103,39 @@ export default async function PeoplePage({
           </p>
         )}
       </section>
+
+      {isOwner && (
+        <section className={cardCls}>
+          <h2 className="mb-3 font-semibold">Public link</h2>
+          <p className="mb-3 text-xs text-neutral-500">
+            Anyone with the link sees a read-only itinerary — no account
+            needed. It never shows budget, journal, or shortlists.
+          </p>
+          <ShareLinkCreateForm tripId={tripId} />
+          {shareLinks.length === 0 ? (
+            <p className="mt-3 text-sm text-neutral-500">
+              No active public links.
+            </p>
+          ) : (
+            <ul className="mt-4 flex flex-col gap-2">
+              {shareLinks.map((l) => (
+                <li
+                  key={l.id}
+                  className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                >
+                  <span>
+                    created {formatDate(l.createdAt, user.homeTimezone)} ·{' '}
+                    {l.expiresAt
+                      ? `expires ${formatDate(l.expiresAt, user.homeTimezone)}`
+                      : 'no expiry'}
+                  </span>
+                  <RevokeShareLinkButton tripId={tripId} linkId={l.id} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       <section className={cardCls}>
         <h2 className="mb-3 font-semibold">Travelers</h2>
