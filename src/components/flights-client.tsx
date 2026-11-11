@@ -6,9 +6,14 @@ import { ArrowLeft, Check, Clock, ExternalLink, Loader2 } from 'lucide-react';
 import {
   manualFlightAction, shortlistFlightAction, startScanAction,
 } from '@/lib/actions/flights';
+import { setPairPrefAction } from '@/lib/actions/date-prefs';
 import { ShortlistedOptions, type ShortlistedOption } from '@/components/shortlisted-options';
 import { SubmitButton } from '@/components/submit-button';
 import type { ActionState } from '@/lib/actions/people';
+import {
+  aggregatePrefs, bestForGroup, pairId, selectionWarning,
+  type DatePairPref, type PairAggregate, type PairAvail,
+} from '@/lib/domain/date-prefs';
 import { passesWindow } from '@/lib/domain/dates/windows';
 import {
   emissionsInfo, flightKey, fmtMin, hhmm as t, isWellFormedItin, layoverFlags, legroomLabel, plusOne,
@@ -232,10 +237,14 @@ function FlightTable({
 
 export function FlightsClient({
   tripId, canEdit, strategySummary, hasKids, travelers, initialSearch, timePrefs, options,
+  currentUserId, members, datePrefs,
 }: {
   tripId: string; canEdit: boolean; strategySummary: string; hasKids: boolean; travelers: number;
   initialSearch: Search | null; timePrefs: { outboundDepart?: { start: string; end: string }; returnDepart?: { start: string; end: string }; timezone?: string };
   options: ShortlistedOption[];
+  currentUserId: string;
+  members: { userId: string; name: string }[];
+  datePrefs: DatePairPref[];
 }) {
   const router = useRouter();
   const [search, setSearch] = useState<Search | null>(initialSearch);
@@ -264,6 +273,15 @@ export function FlightsClient({
   if (initialSearch?.id !== seenSearchId) {
     setSeenSearchId(initialSearch?.id);
     setSearch(initialSearch);
+  }
+
+  // Pair-availability marks: the prop refreshes when another member responds
+  // (pulse → router.refresh); the member's own clicks land optimistically.
+  const [seenPrefs, setSeenPrefs] = useState(datePrefs);
+  const [prefs, setPrefs] = useState(datePrefs);
+  if (datePrefs !== seenPrefs) {
+    setSeenPrefs(datePrefs);
+    setPrefs(datePrefs);
   }
   const running = search && (search.status === 'queued' || search.status === 'running');
 
@@ -328,8 +346,37 @@ export function FlightsClient({
     }
   }
 
+  async function setPref(p: Pair, value: PairAvail) {
+    const key = pairId(p);
+    const before = prefs;
+    setPrefs((cur) => [
+      ...cur.filter((x) => !(x.userId === currentUserId && pairId(x) === key)),
+      { userId: currentUserId, depart: p.depart, back: p.back, value },
+    ]);
+    setActionErr(null);
+    try {
+      const fd = new FormData();
+      fd.set('tripId', tripId);
+      fd.set('depart', p.depart);
+      if (p.back) fd.set('back', p.back);
+      fd.set('value', value);
+      await setPairPrefAction(fd);
+    } catch {
+      setPrefs(before);
+      setActionErr('Could not save your availability — please try again.');
+    }
+  }
+
   const pairs = search?.result?.pairs ?? [];
   const priced = pairs.filter((p) => p.minTotal !== null);
+  // Coordinating needs a choice — a single candidate pair (exact dates)
+  // has nothing to agree on, so the whole availability layer stays hidden.
+  const coordinate = pairs.length > 1;
+  const aggregates = coordinate ? aggregatePrefs(prefs, members.length) : new Map<string, PairAggregate>();
+  const bestPairId = coordinate
+    ? bestForGroup(priced.map((p) => ({ depart: p.depart, back: p.back, price: p.minTotal })), prefs)
+    : null;
+  const pickedWarning = pair ? selectionWarning(pair, prefs, members) : null;
   const lo = priced.length ? Math.min(...priced.map((p) => p.minTotal!)) : null;
   const hi = priced.length ? Math.max(...priced.map((p) => p.minTotal!)) : null;
   const varied = lo !== null && hi !== null && hi > lo;
@@ -472,36 +519,90 @@ export function FlightsClient({
             <h2 className="font-semibold">Pick your dates</h2>
             <p className="text-xs text-neutral-500">
               Lowest round-trip price per date combination{travelers > 1 ? ` for ${plural(travelers, 'traveler')}` : ''}
+              {coordinate && ' · Mark your availability on each card — only members with accounts can respond'}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {pairs.map((p) => {
               const active = pair?.depart === p.depart && pair?.back === p.back;
               const isLow = varied && p.minTotal === lo;
+              const agg = aggregates.get(pairId(p));
+              const mine = prefs.find((x) => x.userId === currentUserId && pairId(x) === pairId(p))?.value ?? null;
+              const showPrefs = coordinate && p.minTotal !== null;
+              const aggParts: string[] = [];
+              if (agg?.works) aggParts.push(`${agg.works} works`);
+              if (agg?.maybe) aggParts.push(`${agg.maybe} iffy`);
+              if (agg?.no) aggParts.push(`${agg.no} can't`);
               return (
-                <button
+                <div
                   key={`${p.depart}|${p.back}`}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => openPair(p)}
-                  className={`rounded-lg border px-3 py-2 text-left transition ${
+                  className={`rounded-lg border px-3 py-2 transition ${
                     active ? 'border-teal-600 ring-2 ring-teal-600/25' : 'border-neutral-200 hover:border-teal-400'
                   } ${isLow ? 'bg-teal-50' : p.status === 'error' ? 'bg-red-50' : 'bg-white'}`}
                 >
-                  <span className="block text-xs font-medium text-neutral-600">
-                    {weekday(p.depart)} {shortDate(p.depart)} → {p.back ? `${weekday(p.back)} ${shortDate(p.back)}` : 'one-way'}
-                  </span>
-                  <span className="mt-0.5 block text-lg font-semibold leading-tight">
-                    {p.status === 'pending' ? <span className="text-sm font-normal text-neutral-400">Checking…</span>
-                      : p.status === 'error' ? <span className="text-sm font-normal text-red-700">Failed — retry</span>
-                      : p.minTotal !== null ? money(p.minTotal, p.currency ?? 'USD')
-                      : <span className="text-sm font-normal text-neutral-500">{p.verified === 'no_match' ? 'No return in your window' : 'No flights'}</span>}
-                  </span>
-                  <span className="block text-xs text-neutral-500">
-                    {p.back ? plural(nightsBetween(p.depart, p.back), 'night') : 'One way'}
-                    {isLow && <span className="font-medium text-teal-700"> · Cheapest</span>}
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => openPair(p)}
+                    className="block w-full text-left"
+                  >
+                    <span className="block text-xs font-medium text-neutral-600">
+                      {weekday(p.depart)} {shortDate(p.depart)} → {p.back ? `${weekday(p.back)} ${shortDate(p.back)}` : 'one-way'}
+                    </span>
+                    <span className="mt-0.5 block text-lg font-semibold leading-tight">
+                      {p.status === 'pending' ? <span className="text-sm font-normal text-neutral-400">Checking…</span>
+                        : p.status === 'error' ? <span className="text-sm font-normal text-red-700">Failed — retry</span>
+                        : p.minTotal !== null ? money(p.minTotal, p.currency ?? 'USD')
+                        : <span className="text-sm font-normal text-neutral-500">{p.verified === 'no_match' ? 'No return in your window' : 'No flights'}</span>}
+                    </span>
+                    <span className="block text-xs text-neutral-500">
+                      {p.back ? plural(nightsBetween(p.depart, p.back), 'night') : 'One way'}
+                      {isLow && <span className="font-medium text-teal-700"> · Cheapest</span>}
+                    </span>
+                  </button>
+                  {bestPairId === pairId(p) && (
+                    <span
+                      data-testid="best-for-group"
+                      className="mt-1 inline-block rounded bg-teal-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-teal-700"
+                    >
+                      Best for the group
+                    </span>
+                  )}
+                  {showPrefs && (
+                    <div className="mt-2 border-t border-neutral-100 pt-2">
+                      <div
+                        role="group"
+                        aria-label={`Your availability for ${weekday(p.depart)} ${shortDate(p.depart)}${p.back ? ` to ${weekday(p.back)} ${shortDate(p.back)}` : ''}`}
+                        className="flex items-center gap-1"
+                      >
+                        <span className="text-[11px] text-neutral-500">You:</span>
+                        {(['works', 'maybe', 'no'] as const).map((v) => (
+                          <button
+                            key={v}
+                            type="button"
+                            aria-pressed={mine === v}
+                            onClick={() => void setPref(p, v)}
+                            className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${
+                              mine === v
+                                ? v === 'works'
+                                  ? 'border-teal-600 bg-teal-50 text-teal-700'
+                                  : v === 'maybe'
+                                    ? 'border-amber-500 bg-amber-50 text-amber-800'
+                                    : 'border-red-400 bg-red-50 text-red-700'
+                                : 'border-neutral-300 text-neutral-600 hover:bg-neutral-100'
+                            }`}
+                          >
+                            {v === 'works' ? 'Works' : v === 'maybe' ? 'Maybe' : 'Can’t'}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-1 text-[11px] leading-snug text-neutral-500">
+                        {aggParts.length ? aggParts.join(' · ') : 'No responses yet'}
+                        {' — of '}{plural(members.length, 'member')}
+                      </p>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -510,6 +611,14 @@ export function FlightsClient({
 
       {pair && (
         <section ref={resultsRef} className={`${card} scroll-mt-4`}>
+          {pickedWarning && (
+            <p
+              data-testid="pair-no-warning"
+              className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800"
+            >
+              {pickedWarning.join(' and ')} marked these dates can’t-go — informational only; you can still pick them.
+            </p>
+          )}
           {!pinned ? (
             <>
               <div className="mb-3">

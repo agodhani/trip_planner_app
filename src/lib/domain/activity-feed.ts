@@ -75,6 +75,8 @@ export function eventTab(
     case 'transport':
       return 'transport';
     case 'flights':
+    case 'dates':
+      // Date-pair availability marks live on the pair grid in Flights.
       return 'flights';
     case 'member':
     case 'invite':

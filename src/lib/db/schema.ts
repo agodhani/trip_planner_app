@@ -112,6 +112,8 @@ export const itemOutcome = pgEnum('item_outcome', [
   'changed',
 ]);
 
+export const pairAvail = pgEnum('pair_avail', ['works', 'maybe', 'no']);
+
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: text('email').notNull().unique(),
@@ -510,6 +512,36 @@ export const expenseShares = pgTable(
     exactAmount: numeric('exact_amount', { precision: 12, scale: 2 }),
   },
   (t) => [primaryKey({ columns: [t.expenseId, t.travelerId] })],
+);
+
+/**
+ * Group availability on candidate date pairs. Pairs are strategy-derived
+ * strings (not DB rows), so depart/back are stored as 'YYYY-MM-DD' text;
+ * a one-way pair stores '' for back — Postgres NULLs can't sit in a PK.
+ */
+export const datePairPrefs = pgTable(
+  'date_pair_prefs',
+  {
+    tripId: uuid('trip_id')
+      .notNull()
+      .references(() => trips.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    depart: text('depart').notNull(),
+    back: text('back').notNull().default(''),
+    value: pairAvail('value').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.tripId, t.userId, t.depart, t.back] }),
+    index('date_pair_prefs_trip_idx').on(t.tripId),
+  ],
 );
 
 export const journalEntries = pgTable('journal_entries', {

@@ -10,7 +10,7 @@ export default async function globalSetup() {
   await migrate(drizzle(sql), { migrationsFolder: './drizzle' });
   await sql`
     TRUNCATE TABLE
-      activity_events, comments, expense_shares, expenses, flight_searches,
+      activity_events, comments, date_pair_prefs, expense_shares, expenses, flight_searches,
       itinerary_items, option_votes, provider_cache, provider_calls,
       sessions, share_links, transport_legs, travelers, trip_invites,
       trip_members, trip_options, trips, users
