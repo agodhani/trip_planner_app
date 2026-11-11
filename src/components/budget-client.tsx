@@ -2,13 +2,14 @@
 
 import { useActionState, useState } from 'react';
 import { Trash2 } from 'lucide-react';
-import { addExpenseAction, deleteExpenseAction } from '@/lib/actions/budget';
+import { addExpenseAction, deleteExpenseAction, setBudgetAction } from '@/lib/actions/budget';
 import type { ActionState } from '@/lib/actions/people';
+import { perPersonCents, type ExpenseCategory } from '@/lib/domain/budget';
 import { weightedSplit } from '@/lib/domain/money';
 import type { BudgetSummary } from '@/lib/services/expenses';
 import { ui } from '@/components/shortlisted-options';
 import { SubmitButton } from '@/components/submit-button';
-import { dayLabel, money } from '@/lib/ui-format';
+import { dayLabel, money, plural } from '@/lib/ui-format';
 
 const { btn, card, inp } = ui;
 const lbl = 'flex flex-col gap-1 text-xs font-medium text-neutral-600';
@@ -22,6 +23,35 @@ type ExpenseRow = {
   shares: { travelerId: string; shares: number | null; exactAmount: number | null }[];
 };
 
+/** Stacked bar: dark = spent, light = still committed, tick = cap. Red when over. */
+function CapBar({ spentCents, committedCents, capCents }: {
+  spentCents: number; committedCents: number; capCents?: number;
+}) {
+  const due = spentCents + committedCents;
+  const max = Math.max(capCents ?? 0, due, 1);
+  const over = capCents !== undefined && due > capCents;
+  const spentPct = (spentCents / max) * 100;
+  const committedPct = (committedCents / max) * 100;
+  return (
+    <div className="relative h-3 w-full overflow-hidden rounded bg-neutral-100">
+      <div
+        className={`absolute inset-y-0 left-0 ${over ? 'bg-red-500' : 'bg-teal-600'}`}
+        style={{ width: `${spentPct}%` }}
+      />
+      <div
+        className={`absolute inset-y-0 ${over ? 'bg-red-300' : 'bg-teal-300'}`}
+        style={{ left: `${spentPct}%`, width: `${committedPct}%` }}
+      />
+      {capCents !== undefined && (
+        <div
+          className="absolute inset-y-0 w-0.5 bg-neutral-700"
+          style={{ left: `calc(${(capCents / max) * 100}% - 1px)` }}
+        />
+      )}
+    </div>
+  );
+}
+
 export function BudgetClient({ tripId, canEdit, summary, travelers, expenses, defaultDate, defaultPayerId }: {
   tripId: string; canEdit: boolean; summary: BudgetSummary;
   travelers: { id: string; name: string }[];
@@ -29,9 +59,29 @@ export function BudgetClient({ tripId, canEdit, summary, travelers, expenses, de
   defaultDate: string; defaultPayerId: string;
 }) {
   const [eState, eAction] = useActionState<ActionState, FormData>(addExpenseAction, {});
+  const [bState, bAction] = useActionState<ActionState, FormData>(setBudgetAction, {});
   const cur = summary.currency;
   const m = (n: number) => money(n, cur, 2);
+  const mc = (cents: number) => m(cents / 100);
   const nameOf = (id: string) => travelers.find((t) => t.id === id)?.name ?? '?';
+
+  // Caps live in integer cents. The effective total is the explicit total
+  // cap, else the sum of any category caps; nothing → budget tracking off.
+  const caps = summary.caps;
+  const catCapSum = Object.values(caps.byCategory).reduce((a, b) => a + (b ?? 0), 0);
+  const effectiveCapCents = caps.totalCents ?? (Object.keys(caps.byCategory).length ? catCapSum : null);
+  const hasBudget = effectiveCapCents !== null;
+  /** Only read inside the hasBudget branch — guaranteed non-null there. */
+  const capTotalCents = effectiveCapCents ?? 0;
+  const totalDueCents = summary.totalActualCents + summary.totalCommittedCents;
+  const overallOver = hasBudget ? Math.max(0, totalDueCents - capTotalCents) : 0;
+  /** 'each' share as a single value, or 'min–max' when remainder cents differ. */
+  const perEach = (totalCents: number): string | null => {
+    const shares = perPersonCents(totalCents, travelers.length);
+    if (!shares.length) return null;
+    const min = Math.min(...shares), max = Math.max(...shares);
+    return min === max ? mc(min) : `${mc(min)}–${mc(max)}`;
+  };
 
   // Controlled so React's post-action form reset can't drop them; we reset
   // ourselves when the action reports success.
@@ -162,6 +212,108 @@ export function BudgetClient({ tripId, canEdit, summary, travelers, expenses, de
           <p className="mt-2 text-xs text-neutral-500">“est.” is the cheapest shortlisted option where nothing is selected yet — it isn&apos;t included in the total.</p>
         )}
       </section>
+
+      {(canEdit || hasBudget) && (
+        <section className={card}>
+          <h2 className="font-semibold">Trip budget</h2>
+          <p className="mb-3 text-xs text-neutral-500">
+            A cap for the whole trip or per category. Committed is what you still owe on selected/booked
+            options after the expenses logged against them — the tick marks the cap.
+          </p>
+          {canEdit && (
+            <details className="mb-3">
+              <summary className="inline-flex cursor-pointer list-none items-center text-xs font-medium text-teal-700 hover:underline [&::-webkit-details-marker]:hidden">
+                {hasBudget ? 'Edit budget caps' : 'Set a budget'}
+              </summary>
+              {/* key remounts the uncontrolled inputs when caps change server-side. */}
+              <form key={JSON.stringify(caps)} action={bAction} className="mt-3 flex flex-col gap-3">
+                <input type="hidden" name="tripId" value={tripId} />
+                <label className={`${lbl} max-w-40`}>Total cap ({cur})
+                  <input
+                    name="budgetTotal" type="number" step="0.01" min="0" placeholder="no cap"
+                    defaultValue={caps.totalCents === null ? '' : caps.totalCents / 100}
+                    className={inp}
+                  />
+                </label>
+                <div>
+                  <p className="mb-1 text-xs text-neutral-500">Category caps (optional — blank means none)</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {CATS.map((c) => {
+                      const v = caps.byCategory[c as ExpenseCategory];
+                      return (
+                        <label key={c} className={lbl}>{cap(c)}
+                          <input
+                            name={`cap:${c}`} type="number" step="0.01" min="0" placeholder="—"
+                            defaultValue={v === undefined ? '' : v / 100}
+                            className={inp}
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <SubmitButton className={btn}>Save budget</SubmitButton>
+                  {bState.error && <p role="alert" className="text-sm text-red-600">{bState.error}</p>}
+                </div>
+              </form>
+            </details>
+          )}
+          {hasBudget ? (
+            <div className="flex flex-col gap-3">
+              <div>
+                <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2 text-sm">
+                  <span className="font-medium">Overall</span>
+                  <span className="text-xs text-neutral-600">
+                    spent {mc(summary.totalActualCents)} · committed {mc(summary.totalCommittedCents)} · cap {mc(capTotalCents)}
+                  </span>
+                </div>
+                <CapBar spentCents={summary.totalActualCents} committedCents={summary.totalCommittedCents} capCents={capTotalCents} />
+                <p className="mt-1 text-xs">
+                  {overallOver > 0 ? (
+                    <span className="font-medium text-red-600" data-testid="cap-over">over by {mc(overallOver)}</span>
+                  ) : (
+                    <span className="font-medium text-teal-700" data-testid="cap-left">{mc(capTotalCents - totalDueCents)} left</span>
+                  )}
+                </p>
+              </div>
+              {summary.rollups.length > 0 && (
+                <ul className="flex flex-col gap-2 border-t border-neutral-100 pt-3">
+                  {summary.rollups.map((r) => (
+                    <li key={r.category} data-testid={`cat-bar-${r.category}`}>
+                      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2 text-sm">
+                        <span>{cap(r.category)}{r.capCents !== undefined ? ` — cap ${mc(r.capCents)}` : ''}</span>
+                        <span className="text-xs text-neutral-600">spent {mc(r.spentCents)} · committed {mc(r.committedCents)}</span>
+                      </div>
+                      <CapBar spentCents={r.spentCents} committedCents={r.committedCents} capCents={r.capCents} />
+                      {r.overCents !== undefined && r.overCents > 0 && (
+                        <p className="mt-0.5 text-xs font-medium text-red-600" data-testid={`cat-over-${r.category}`}>over by {mc(r.overCents)}</p>
+                      )}
+                      {r.leftCents !== undefined && r.overCents === 0 && (
+                        <p className="mt-0.5 text-xs text-teal-700" data-testid={`cat-left-${r.category}`}>{mc(r.leftCents)} left</p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="border-t border-neutral-100 pt-2 text-sm font-medium" data-testid="cap-totals">
+                Total: spent {mc(summary.totalActualCents)} · committed {mc(summary.totalCommittedCents)} · cap {mc(capTotalCents)}
+              </p>
+              {/* Per-capita figures only make sense while a cap exists. */}
+              {travelers.length > 0 && (
+                <p className="text-xs text-neutral-600" data-testid="per-person-line">
+                  Per person ({plural(travelers.length, 'traveler')}): cap {perEach(capTotalCents)} · spent {perEach(summary.totalActualCents)}
+                  {summary.totalCommittedCents > 0 ? ` · committed ${perEach(summary.totalCommittedCents)}` : ''}
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-neutral-500">
+              No budget set yet{canEdit ? ' — set a total or per-category caps above to track against' : ''}.
+            </p>
+          )}
+        </section>
+      )}
 
       {summary.balances.length > 0 && travelers.length > 1 && (
         <section className={card}>

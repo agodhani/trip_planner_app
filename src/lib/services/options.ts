@@ -1,11 +1,17 @@
 import 'server-only';
-import { and, desc, eq, inArray, ne } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { comments, optionVotes, tripOptions, trips, users } from '@/lib/db/schema';
+import { comments, optionVotes, travelers, tripOptions, trips, users } from '@/lib/db/schema';
+import { categoryForOptionKind } from '@/lib/domain/budget';
 import { compareDataFor } from '@/lib/domain/compare';
+import { planSplit, toBaseCents, toCents, type SplitRow } from '@/lib/domain/money';
 import { tripWindowForSelection } from '@/lib/domain/trip-window';
+import { fxRate } from '@/lib/providers/frankfurter';
+import { todayISO } from '@/lib/clock';
+import { money } from '@/lib/ui-format';
 import { assertTripRole, NotFoundError } from './access';
 import { recordEvent, touchTrip, type Tx } from './events';
+import { insertExpenseRows } from './expenses';
 import { tripDays } from './itinerary';
 
 export type OptionStatus = 'shortlisted' | 'selected' | 'booked' | 'rejected';
@@ -68,14 +74,93 @@ export async function addOption(
   });
 }
 
+export type BookingPayment = {
+  /** Actual amount paid; defaults to the option price when omitted. */
+  paidAmount?: number | null;
+  /** Defaults to the option price currency, then the trip currency. */
+  paidCurrency?: string | null;
+  /** When true, a linked expense is created in the same transaction. */
+  logExpense?: boolean;
+};
+
+type ExpensePlan = {
+  amount: number;
+  currency: string;
+  rate: number;
+  baseCents: number;
+  spentOn: string;
+  payerTravelerId: string;
+  rows: SplitRow[];
+};
+
+/**
+ * Plan the booked→spent bridge before the transaction: FX (a provider call)
+ * must not run inside the tx. Returns the plan, or a human note explaining
+ * why no expense will be logged. The expense records the actual paid amount;
+ * any remainder of the option price stays committed via unpaidCommittedCents.
+ */
+async function planBookingExpense(
+  user: { id: string; homeTimezone?: string },
+  tripId: string,
+  opt: typeof tripOptions.$inferSelect,
+  booking: BookingPayment,
+  tripCurrency: string,
+): Promise<{ plan: ExpensePlan | null; note: string | null }> {
+  const amount =
+    booking.paidAmount ?? (opt.priceAmount != null ? Number(opt.priceAmount) : 0);
+  if (!Number.isFinite(amount) || amount < 0) return { plan: null, note: 'invalid paid amount' };
+  if (amount === 0) return { plan: null, note: 'no payment amount to log' };
+  const currency = booking.paidCurrency ?? opt.priceCurrency ?? tripCurrency;
+  const tvl = await db.select().from(travelers).where(eq(travelers.tripId, tripId)).orderBy(asc(travelers.createdAt));
+  const payer = tvl.find((t) => t.userId === user.id);
+  if (!payer) {
+    return { plan: null, note: 'your account is not linked to a traveler on this trip' };
+  }
+  const spentOn = todayISO(user.homeTimezone ?? 'UTC');
+  const rate = currency === tripCurrency ? 1 : await fxRate(currency, tripCurrency, spentOn);
+  const amountCents = toCents(amount);
+  const baseCents = toBaseCents(amount, rate);
+  const planned = planSplit(
+    { method: 'equal', travelerIds: tvl.map((t) => t.id) },
+    amountCents, baseCents, currency,
+  );
+  if ('error' in planned) return { plan: null, note: planned.error };
+  return {
+    plan: {
+      amount, currency, rate, baseCents, spentOn,
+      payerTravelerId: payer.id, rows: planned.rows,
+    },
+    note: null,
+  };
+}
+
 export async function setOptionStatus(
-  user: { id: string; name: string },
+  user: { id: string; name: string; homeTimezone?: string },
   tripId: string,
   optionId: string,
   status: OptionStatus,
   bookingRef?: string | null,
+  booking?: BookingPayment,
 ) {
   await assertTripRole(tripId, user.id, 'editor');
+
+  // Plan the expense outside the transaction (FX can hit the network). The
+  // option is re-read inside the tx — the outside read only feeds defaults.
+  let expensePlan: ExpensePlan | null = null;
+  let expenseNote: string | null = null;
+  if (status === 'booked' && booking?.logExpense) {
+    const [opt, tripRow] = await Promise.all([
+      db.select().from(tripOptions)
+        .where(and(eq(tripOptions.id, optionId), eq(tripOptions.tripId, tripId))).limit(1),
+      db.select({ currency: trips.currency }).from(trips).where(eq(trips.id, tripId)).limit(1),
+    ]);
+    if (!opt[0]) throw new NotFoundError('Option not found');
+    if (!tripRow[0]) throw new NotFoundError('Trip not found');
+    const r = await planBookingExpense(user, tripId, opt[0], booking, tripRow[0].currency);
+    expensePlan = r.plan;
+    expenseNote = r.note;
+  }
+
   await db.transaction(async (tx) => {
     const opt = await tx.select().from(tripOptions)
       .where(and(eq(tripOptions.id, optionId), eq(tripOptions.tripId, tripId))).limit(1);
@@ -107,9 +192,28 @@ export async function setOptionStatus(
     await tx.update(tripOptions)
       .set({ status, bookingRef: bookingRef ?? opt[0].bookingRef, updatedAt: new Date() })
       .where(eq(tripOptions.id, optionId));
+    let expenseSummary = '';
+    if (expensePlan) {
+      // The bridge: the paid amount becomes spent immediately, split equally
+      // across the travelers, and stays linked so the option's committed
+      // remainder can't double-count it.
+      await insertExpenseRows(tx, {
+        tripId, description: opt[0].title, category: categoryForOptionKind(opt[0].kind),
+        amount: expensePlan.amount, currency: expensePlan.currency,
+        rate: expensePlan.rate, baseCents: expensePlan.baseCents,
+        spentOn: expensePlan.spentOn, paidByTravelerId: expensePlan.payerTravelerId,
+        split: { method: 'equal', travelerIds: expensePlan.rows.map((r) => r.travelerId) },
+        planned: expensePlan.rows,
+        optionId, notes: 'Logged automatically when marked booked',
+        createdBy: user.id,
+      });
+      expenseSummary = ` and logged ${money(expensePlan.amount, expensePlan.currency, 2)}`;
+    } else if (expenseNote) {
+      expenseSummary = ` (expense not logged: ${expenseNote})`;
+    }
     await recordEvent(tx, {
       tripId, userId: user.id, verb: `option.${status}`,
-      summary: `${user.name} marked ${opt[0].title} as ${status}`,
+      summary: `${user.name} marked ${opt[0].title} as ${status}${expenseSummary}`,
       entityType: 'option', entityId: optionId,
     });
   });

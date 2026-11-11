@@ -6,8 +6,9 @@ import { formFields } from '@/lib/form-data';
 import { requireTripRole } from '@/lib/auth/guards';
 import { NotFoundError } from '@/lib/services/access';
 import {
-  addExpense, addJournalEntry, deleteExpense, setItemOutcome, setTripStatus,
+  addExpense, addJournalEntry, deleteExpense, setItemOutcome, setTripBudget, setTripStatus,
 } from '@/lib/services/expenses';
+import { EXPENSE_CATEGORIES, type CategoryCaps, type ExpenseCategory } from '@/lib/domain/budget';
 import type { SplitInput } from '@/lib/domain/money';
 import type { ActionState } from './people';
 
@@ -69,6 +70,36 @@ export async function addExpenseAction(_prev: ActionState, formData: FormData): 
     return { error: err instanceof Error ? err.message : 'Could not add expense' };
   }
   revalidatePath(`/trips/${tripId}/budget`);
+  return {};
+}
+
+/** Parse a money field: blank → absent, otherwise a non-negative amount in cents. */
+function capField(raw: string, label: string): number | null | { error: string } {
+  if (raw === '') return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return { error: `${label} must be a non-negative amount` };
+  return Math.round(n * 100);
+}
+
+export async function setBudgetAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const tripId = String(formData.get('tripId') ?? '');
+  const { user } = await requireTripRole(tripId, 'editor');
+  const total = capField(String(formData.get('budgetTotal') ?? '').trim(), 'Total budget');
+  if (total !== null && typeof total === 'object') return { error: total.error };
+  const byCategory: CategoryCaps = {};
+  for (const c of EXPENSE_CATEGORIES) {
+    // Only enum keys are read — anything else in the form is ignored. Blank
+    // means absent, so clearing an input removes that cap.
+    const v = capField(String(formData.get(`cap:${c}`) ?? '').trim(), `${c[0].toUpperCase()}${c.slice(1)} cap`);
+    if (v !== null && typeof v === 'object') return { error: v.error };
+    if (v !== null) byCategory[c as ExpenseCategory] = v;
+  }
+  try {
+    await setTripBudget(user, tripId, { totalCents: total, byCategory });
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Could not save the budget' };
+  }
+  revalidatePath(`/trips/${tripId}`, 'layout');
   return {};
 }
 

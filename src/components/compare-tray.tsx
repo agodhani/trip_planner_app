@@ -6,6 +6,7 @@ import {
 import { Check, ExternalLink, ThumbsDown, ThumbsUp, X } from 'lucide-react';
 import { optionStatusAction, voteAction } from '@/lib/actions/options';
 import { buildCompare } from '@/lib/domain/compare';
+import { MarkBookedControl } from '@/components/mark-booked';
 import { SubmitButton } from '@/components/submit-button';
 
 /** The fields the tray needs — ShortlistedOption is structurally assignable. */
@@ -270,6 +271,12 @@ export function CompareTray({
                                 <input type="hidden" name="status" value="selected" />
                                 <SubmitButton className={btn}>Select</SubmitButton>
                               </form>
+                            )}
+                            {canEdit && o.status === 'selected' && (
+                              <MarkBookedControl
+                                tripId={tripId} section={section} optionId={o.id}
+                                price={o.price} currency={o.currency} align="left"
+                              />
                             )}
                             {o.bookingUrl && (
                               <a href={o.bookingUrl} target="_blank" rel="noopener noreferrer" className={btn2}>

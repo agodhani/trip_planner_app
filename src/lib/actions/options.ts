@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { formFields } from '@/lib/form-data';
 import { requireTripRole } from '@/lib/auth/guards';
 import { NotFoundError } from '@/lib/services/access';
-import { addOption, deleteOption, setOptionStatus, vote } from '@/lib/services/options';
+import { addOption, deleteOption, setOptionStatus, vote, type BookingPayment } from '@/lib/services/options';
 import { addComment } from '@/lib/services/comments';
 import type { ActionState } from './people';
 
@@ -61,6 +61,12 @@ export async function shortlistOptionAction(formData: FormData): Promise<ActionS
   return {};
 }
 
+const bookingSchema = z.object({
+  paidAmount: z.coerce.number().nonnegative().optional(),
+  paidCurrency: z.string().regex(/^[A-Z]{3}$/).optional(),
+  logExpense: z.literal('on').optional(),
+});
+
 export async function optionStatusAction(formData: FormData): Promise<void> {
   const tripId = z.string().uuid().parse(formData.get('tripId'));
   const section = sectionEnum.parse(formData.get('section'));
@@ -68,7 +74,25 @@ export async function optionStatusAction(formData: FormData): Promise<void> {
   const status = z.enum(['shortlisted', 'selected', 'booked', 'rejected']).parse(formData.get('status'));
   const bookingRef = (formData.get('bookingRef') as string) || null;
   const { user } = await requireTripRole(tripId, 'editor');
-  await setOptionStatus(user, tripId, optionId, status, bookingRef);
+  // The booked→spent bridge fields ride along on the mark-booked form only.
+  // Blank inputs are absent (formFields), so defaults resolve from the
+  // option price server-side. An unchecked box submits nothing → no expense.
+  let booking: BookingPayment | undefined;
+  if (status === 'booked') {
+    const fields = formFields(formData);
+    if (typeof fields.paidCurrency === 'string') {
+      fields.paidCurrency = fields.paidCurrency.trim().toUpperCase();
+    }
+    const parsed = bookingSchema.safeParse(fields);
+    if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Invalid payment input');
+    const p = parsed.data;
+    booking = {
+      paidAmount: p.paidAmount ?? null,
+      paidCurrency: p.paidCurrency ?? null,
+      logExpense: p.logExpense === 'on',
+    };
+  }
+  await setOptionStatus(user, tripId, optionId, status, bookingRef, booking);
   revalidate(tripId, section);
 }
 

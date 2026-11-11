@@ -2,15 +2,61 @@ import 'server-only';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { expenses, expenseShares, itineraryItems, journalEntries, travelers, tripOptions, trips, users } from '@/lib/db/schema';
+import {
+  categoryForOptionKind,
+  EXPENSE_CATEGORIES,
+  rollupsByCategory,
+  unpaidCommittedCents,
+  type CategoryCaps,
+  type CategoryRollup,
+  type ExpenseCategory,
+} from '@/lib/domain/budget';
 import { fxRate } from '@/lib/providers/frankfurter';
-import { planSplit, settleUp, toBaseCents, toCents, type Balance, type SplitInput, type Transfer } from '@/lib/domain/money';
+import { planSplit, settleUp, toBaseCents, toCents, type Balance, type SplitInput, type SplitRow, type Transfer } from '@/lib/domain/money';
 import { money } from '@/lib/ui-format';
 import { assertTripRole, NotFoundError } from './access';
-import { recordEvent } from './events';
+import { recordEvent, type Tx } from './events';
 import { getTrip } from './trips';
 
 export async function listTravelers(tripId: string) {
   return db.select().from(travelers).where(eq(travelers.tripId, tripId)).orderBy(asc(travelers.createdAt));
+}
+
+/**
+ * Insert an expense plus its shares inside a caller's transaction. Split out
+ * of addExpense so the booked→spent bridge in services/options.ts can create
+ * the expense in the same transaction as the status change. The caller
+ * resolves FX, plans the split (planSplit), and records the activity event.
+ */
+export async function insertExpenseRows(
+  tx: Tx,
+  input: {
+    tripId: string; description: string; category: string; amount: number; currency: string;
+    rate: number; baseCents: number; spentOn: string; paidByTravelerId: string;
+    split: SplitInput; planned: SplitRow[];
+    optionId?: string | null; itineraryItemId?: string | null;
+    notes?: string | null; createdBy: string;
+  },
+) {
+  const [row] = await tx.insert(expenses).values({
+    tripId: input.tripId, description: input.description, category: input.category as never,
+    amount: String(input.amount), currency: input.currency,
+    fxRate: String(input.rate), amountBase: String(input.baseCents / 100),
+    spentOn: input.spentOn, paidByTravelerId: input.paidByTravelerId,
+    splitMethod: input.split.method, optionId: input.optionId ?? null,
+    itineraryItemId: input.itineraryItemId ?? null,
+    notes: input.notes ?? null, createdBy: input.createdBy,
+  }).returning();
+  if (input.planned.length > 0) {
+    await tx.insert(expenseShares).values(
+      input.planned.map((r) => ({
+        expenseId: row.id, travelerId: r.travelerId, shareBase: String(r.shareBaseCents / 100),
+        shares: r.shares !== undefined ? String(r.shares) : null,
+        exactAmount: r.exactCents !== undefined ? String(r.exactCents / 100) : null,
+      })),
+    );
+  }
+  return row;
 }
 
 export async function addExpense(
@@ -38,22 +84,14 @@ export async function addExpense(
   if ('error' in planned) throw new Error(planned.error);
 
   return db.transaction(async (tx) => {
-    const [row] = await tx.insert(expenses).values({
-      tripId, description: input.description, category: input.category as never,
-      amount: String(input.amount), currency: input.currency,
-      fxRate: String(rate), amountBase: String(baseCents / 100),
+    const row = await insertExpenseRows(tx, {
+      tripId, description: input.description, category: input.category,
+      amount: input.amount, currency: input.currency, rate, baseCents,
       spentOn: input.spentOn, paidByTravelerId: input.paidByTravelerId,
-      splitMethod: split.method, optionId: input.optionId ?? null,
-      itineraryItemId: input.itineraryItemId ?? null,
-      notes: input.notes ?? null, createdBy: user.id,
-    }).returning();
-    await tx.insert(expenseShares).values(
-      planned.rows.map((r) => ({
-        expenseId: row.id, travelerId: r.travelerId, shareBase: String(r.shareBaseCents / 100),
-        shares: r.shares !== undefined ? String(r.shares) : null,
-        exactAmount: r.exactCents !== undefined ? String(r.exactCents / 100) : null,
-      })),
-    );
+      split, planned: planned.rows,
+      optionId: input.optionId, itineraryItemId: input.itineraryItemId,
+      notes: input.notes, createdBy: user.id,
+    });
     await recordEvent(tx, {
       tripId, userId: user.id, verb: 'expense.added',
       summary: `${user.name} logged ${input.description} (${money(input.amount, input.currency, 2)})`,
@@ -100,13 +138,43 @@ export type BudgetSummary = {
   estimateByCategory: Record<string, { amount: number; count: number }>;
   actualByCategory: Record<string, number>;
   totalActualCents: number;
+  /**
+   * Unpaid remainder of selected/booked options per category, in base cents.
+   * A booked option whose expense is already logged contributes ~0 here, so
+   * booked+paid never double-counts.
+   */
+  committedCentsByCategory: Record<string, number>;
+  totalCommittedCents: number;
+  /** Base-currency cents per category (all expenses, linked or not). */
+  spentCentsByCategory: Record<string, number>;
+  caps: { totalCents: number | null; byCategory: CategoryCaps };
+  /** Per-category committed/spent/cap rows for the stacked bars, enum order. */
+  rollups: CategoryRollup[];
   balances: (Balance & { name: string })[];
   transfers: (Transfer & { fromName: string; toName: string })[];
   currency: string;
 };
 
+/**
+ * Read the stored category caps: only enum keys, finite numbers ≥ 0, stored
+ * as integer cents. Anything else is ignored so a hand-edited row can't
+ * break the budget page.
+ */
+export function parseCategoryCaps(raw: unknown): CategoryCaps {
+  const out: CategoryCaps = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const [k, v] of Object.entries(raw)) {
+    if (!(EXPENSE_CATEGORIES as readonly string[]).includes(k)) continue;
+    if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) continue;
+    out[k as ExpenseCategory] = Math.round(v);
+  }
+  return out;
+}
+
 export async function budgetSummary(tripId: string, currency: string): Promise<BudgetSummary> {
-  const [opts, exps, tvl] = await Promise.all([
+  const [tripRow, opts, exps, tvl] = await Promise.all([
+    db.select({ budgetTotal: trips.budgetTotal, budgetByCategory: trips.budgetByCategory })
+      .from(trips).where(eq(trips.id, tripId)).limit(1),
     db.select().from(tripOptions).where(eq(tripOptions.tripId, tripId)),
     listExpenses(tripId),
     listTravelers(tripId),
@@ -115,15 +183,39 @@ export async function budgetSummary(tripId: string, currency: string): Promise<B
   // alternatives are not summed — three candidate flights aren't three flights.
   const plannedByCategory: Record<string, number> = {};
   const estimateByCategory: Record<string, { amount: number; count: number }> = {};
-  const catOf = (kind: string) =>
-    kind === 'flight' ? 'flights' : kind === 'lodging' ? 'lodging' : kind === 'transport' ? 'transport' : 'activities';
+  const actualByCategory: Record<string, number> = {};
+  const committedCentsByCategory: Record<string, number> = {};
+  const spentCentsByCategory: Record<string, number> = {};
+  const linkedCentsByOption = new Map<string, number>();
+  const net = new Map<string, number>();
+  let total = 0;
+  for (const { expense, shares } of exps) {
+    const cents = Math.round(Number(expense.amountBase) * 100);
+    total += cents;
+    actualByCategory[expense.category] = (actualByCategory[expense.category] ?? 0) + cents / 100;
+    spentCentsByCategory[expense.category] = (spentCentsByCategory[expense.category] ?? 0) + cents;
+    if (expense.optionId) {
+      linkedCentsByOption.set(expense.optionId, (linkedCentsByOption.get(expense.optionId) ?? 0) + cents);
+    }
+    net.set(expense.paidByTravelerId, (net.get(expense.paidByTravelerId) ?? 0) + cents);
+    for (const s of shares) {
+      net.set(s.travelerId, (net.get(s.travelerId) ?? 0) - Math.round(Number(s.shareBase) * 100));
+    }
+  }
+  let totalCommittedCents = 0;
   for (const o of opts) {
     if ((o.status !== 'selected' && o.status !== 'booked') || !o.priceAmount) continue;
-    const cat = catOf(o.kind);
+    const cat = categoryForOptionKind(o.kind);
     plannedByCategory[cat] = (plannedByCategory[cat] ?? 0) + Number(o.priceAmount);
+    // Option prices and expenses are both tracked in trip-currency units —
+    // the unpaid remainder is exact in the common same-currency case and an
+    // approximation under FX, matching plannedByCategory's convention.
+    const unpaid = unpaidCommittedCents(Math.round(Number(o.priceAmount) * 100), linkedCentsByOption.get(o.id) ?? 0);
+    if (unpaid > 0) committedCentsByCategory[cat] = (committedCentsByCategory[cat] ?? 0) + unpaid;
+    totalCommittedCents += unpaid;
   }
   for (const o of opts) {
-    const cat = catOf(o.kind);
+    const cat = categoryForOptionKind(o.kind);
     if (o.status !== 'shortlisted' || !o.priceAmount || plannedByCategory[cat] !== undefined) continue;
     if (cat !== 'flights' && cat !== 'lodging') continue;
     const e = estimateByCategory[cat];
@@ -132,24 +224,60 @@ export async function budgetSummary(tripId: string, currency: string): Promise<B
       count: (e?.count ?? 0) + 1,
     };
   }
-  const actualByCategory: Record<string, number> = {};
-  const net = new Map<string, number>();
-  let total = 0;
-  for (const { expense, shares } of exps) {
-    const cents = Math.round(Number(expense.amountBase) * 100);
-    total += cents;
-    actualByCategory[expense.category] = (actualByCategory[expense.category] ?? 0) + cents / 100;
-    net.set(expense.paidByTravelerId, (net.get(expense.paidByTravelerId) ?? 0) + cents);
-    for (const s of shares) {
-      net.set(s.travelerId, (net.get(s.travelerId) ?? 0) - Math.round(Number(s.shareBase) * 100));
-    }
-  }
+  const caps = {
+    totalCents: tripRow[0]?.budgetTotal != null ? Math.round(Number(tripRow[0].budgetTotal) * 100) : null,
+    byCategory: parseCategoryCaps(tripRow[0]?.budgetByCategory),
+  };
+  const rollups = rollupsByCategory(caps.byCategory, spentCentsByCategory, committedCentsByCategory);
   const nameOf = new Map(tvl.map((t) => [t.id, t.displayName]));
   const balances = [...net.entries()].map(([travelerId, netCents]) => ({ travelerId, netCents, name: nameOf.get(travelerId) ?? '?' }));
   const transfers = settleUp(balances).map((t) => ({
     ...t, fromName: nameOf.get(t.from) ?? '?', toName: nameOf.get(t.to) ?? '?',
   }));
-  return { plannedByCategory, estimateByCategory, actualByCategory, totalActualCents: total, balances, transfers, currency };
+  return {
+    plannedByCategory, estimateByCategory, actualByCategory, totalActualCents: total,
+    committedCentsByCategory, totalCommittedCents, spentCentsByCategory,
+    caps, rollups, balances, transfers, currency,
+  };
+}
+
+/**
+ * Set/clear the trip's budget caps. `totalCents` null clears the total;
+ * `byCategory` is already validated (enum keys, integer cents ≥ 0) and an
+ * empty map clears the column.
+ */
+export async function setTripBudget(
+  user: { id: string; name: string },
+  tripId: string,
+  input: { totalCents: number | null; byCategory: CategoryCaps },
+) {
+  await assertTripRole(tripId, user.id, 'editor');
+  await db.transaction(async (tx) => {
+    const cur = await tx.select({ id: trips.id, currency: trips.currency })
+      .from(trips).where(eq(trips.id, tripId)).limit(1);
+    if (!cur[0]) throw new NotFoundError('Trip not found');
+    const byCategory = Object.fromEntries(
+      Object.entries(input.byCategory).filter(([, v]) => v !== undefined),
+    ) as CategoryCaps;
+    await tx.update(trips).set({
+      budgetTotal: input.totalCents === null ? null : (input.totalCents / 100).toFixed(2),
+      budgetByCategory: Object.keys(byCategory).length > 0 ? byCategory : null,
+      updatedAt: new Date(),
+    }).where(eq(trips.id, tripId));
+    const capList = Object.entries(byCategory)
+      .map(([c, cents]) => `${c} ${money((cents ?? 0) / 100, cur[0].currency, 2)}`)
+      .join(', ');
+    const parts: string[] = [];
+    if (input.totalCents !== null) parts.push(money(input.totalCents / 100, cur[0].currency, 2));
+    if (capList) parts.push(`caps: ${capList}`);
+    await recordEvent(tx, {
+      tripId, userId: user.id, verb: 'budget.set',
+      summary: parts.length
+        ? `${user.name} set the trip budget to ${parts.join(' · ')}`
+        : `${user.name} cleared the trip budget`,
+      entityType: 'trip', entityId: tripId,
+    });
+  });
 }
 
 // ----- trip log -----

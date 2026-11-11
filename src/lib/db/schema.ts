@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import type { ExpenseCategory } from '@/lib/domain/budget';
 import type { DateStrategy, TimePrefs } from '@/lib/domain/dates/strategy';
 import type { PlaceRef } from '@/lib/providers/types';
 import {
@@ -164,6 +165,12 @@ export const trips = pgTable('trips', {
   startDate: date('start_date'),
   endDate: date('end_date'),
   currency: char('currency', { length: 3 }).notNull().default('USD'),
+  // Trip budget caps, in the trip currency. budgetByCategory holds integer
+  // cents per expense_category key (partial map; absent key = no cap).
+  budgetTotal: numeric('budget_total', { precision: 12, scale: 2 }),
+  budgetByCategory: jsonb('budget_by_category').$type<
+    Partial<Record<ExpenseCategory, number>>
+  >(),
   version: integer('version').notNull().default(1),
   notes: text('notes'),
   createdAt: timestamp('created_at', { withTimezone: true })
@@ -588,3 +595,5 @@ export const activityEvents = pgTable(
 export const tripStatusValues = tripStatus.enumValues;
 export type TripStatus = (typeof tripStatusValues)[number];
 export type MemberRole = (typeof memberRole.enumValues)[number];
+export type ExpenseCategoryValue = (typeof expenseCategory.enumValues)[number];
+export type OptionKindValue = (typeof optionKind.enumValues)[number];

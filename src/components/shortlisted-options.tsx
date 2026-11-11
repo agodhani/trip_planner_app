@@ -8,6 +8,7 @@ import {
 import type { ActionState } from '@/lib/actions/people';
 import { SubmitButton } from '@/components/submit-button';
 import { CompareToggle, CompareTray } from '@/components/compare-tray';
+import { MarkBookedControl } from '@/components/mark-booked';
 import { money } from '@/lib/ui-format';
 
 export type ShortlistedOption = {
@@ -104,11 +105,10 @@ export function ShortlistedOptions({
                     </form>
                   )}
                   {canEdit && o.status === 'selected' && (
-                    <form action={optionStatusAction} className="flex gap-1">
-                      <HiddenIds tripId={tripId} section={section} optionId={o.id} /><input type="hidden" name="status" value="booked" />
-                      <input name="bookingRef" placeholder="Confirmation # (optional)" aria-label="Confirmation number" className={`${inp} w-44`} />
-                      <SubmitButton className={btn}>Mark booked</SubmitButton>
-                    </form>
+                    <MarkBookedControl
+                      tripId={tripId} section={section} optionId={o.id}
+                      price={o.price} currency={o.currency}
+                    />
                   )}
                   {o.bookingUrl && (
                     <a href={o.bookingUrl} target="_blank" rel="noopener noreferrer" className={`${btn2} inline-flex items-center gap-1`}>

@@ -69,6 +69,7 @@ export function eventTab(
           return 'shortlist';
       }
     case 'expense':
+    case 'budget':
       return 'budget';
     case 'itinerary':
       return 'itinerary';
