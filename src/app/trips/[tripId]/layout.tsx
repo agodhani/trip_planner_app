@@ -8,6 +8,7 @@ import { safeZone, tripLive, tripPhase } from '@/lib/domain/today';
 import { tripDays } from '@/lib/services/itinerary';
 import { tripProgress } from '@/lib/services/progress';
 import { latestEventId } from '@/lib/services/pulse';
+import { hasRecapContent } from '@/lib/services/recap';
 import { getTrip, listMemberUsers } from '@/lib/services/trips';
 import { dateRange, plural } from '@/lib/ui-format';
 import { notFound } from 'next/navigation';
@@ -31,10 +32,11 @@ export default async function TripLayout({
   const { user } = await requireTripRole(tripId, 'viewer');
   const trip = await getTrip(tripId);
   if (!trip) notFound();
-  const [members, progress, initialEventId] = await Promise.all([
+  const [members, progress, initialEventId, recap] = await Promise.all([
     listMemberUsers(tripId),
     tripProgress(trip),
     latestEventId(tripId),
+    hasRecapContent(trip),
   ]);
   const state = Object.fromEntries(progress.steps.map((s) => [s.key, s.state]));
   const travelers = trip.adults + trip.childrenAges.length;
@@ -76,6 +78,7 @@ export default async function TripLayout({
               done={{ flights: state.flights === 'done', stay: state.stay === 'done' }}
               shortlistCount={progress.shortlistCount}
               live={live}
+              recap={recap}
             />
           </div>
         </div>

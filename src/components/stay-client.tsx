@@ -70,7 +70,9 @@ function LodgingTable({ items, canEdit, onShortlist, isShortlisted, isPending, t
   );
   const cols = 5 + (nearPoint ? 1 : 0) + (activities.length > 0 ? 1 : 0);
   return (
-    <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
+    // `relative`: sr-only header text is absolutely positioned — it must stay
+    // inside this scroller or it widens the page at small viewports.
+    <div className="relative overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-neutral-200 text-xs uppercase tracking-wide text-neutral-500">

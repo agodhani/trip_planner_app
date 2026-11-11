@@ -4,6 +4,7 @@ import { todayISO } from '@/lib/clock';
 import { orderDay } from '@/lib/domain/itinerary';
 import { listItems, tripDays } from '@/lib/services/itinerary';
 import { listJournal } from '@/lib/services/expenses';
+import { hasRecapContent } from '@/lib/services/recap';
 import { getTrip } from '@/lib/services/trips';
 import { LogClient } from '@/components/log-client';
 
@@ -12,7 +13,11 @@ export default async function LogPage({ params }: { params: Promise<{ tripId: st
   const { user, role } = await requireTripRole(tripId, 'viewer');
   const trip = await getTrip(tripId);
   if (!trip) notFound();
-  const [items, journal] = await Promise.all([listItems(tripId), listJournal(tripId)]);
+  const [items, journal, recapReady] = await Promise.all([
+    listItems(tripId),
+    listJournal(tripId),
+    hasRecapContent(trip),
+  ]);
   const range = tripDays(trip);
   const today = todayISO(user.homeTimezone);
   const byDay = new Map<string, typeof items>();
@@ -30,6 +35,7 @@ export default async function LogPage({ params }: { params: Promise<{ tripId: st
         outcomeNotes: i.outcomeNotes, rating: i.rating, unplanned: i.unplanned,
       }))}
       journal={journal.map(({ j }) => ({ id: j.id, day: j.day, body: j.body }))}
+      recapReady={recapReady}
     />
   );
 }

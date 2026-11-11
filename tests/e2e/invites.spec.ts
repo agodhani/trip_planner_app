@@ -48,7 +48,8 @@ test('invite link: second user signs up through it and joins', async ({
   await page.getByRole('link', { name: 'People' }).click();
   await expect(page.getByText('E2E Joiner').first()).toBeVisible();
   await page.getByRole('link', { name: 'Overview' }).click();
+  // exact: the pulse toast appends '· People' to the same text.
   await expect(
-    page.getByText('E2E Joiner joined via an invite link'),
+    page.getByText('E2E Joiner joined via an invite link', { exact: true }),
   ).toBeVisible();
 });

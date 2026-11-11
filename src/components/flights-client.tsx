@@ -111,7 +111,9 @@ function FlightTable({
     </th>
   );
   return (
-    <div className="overflow-x-auto" data-testid={testId}>
+    // `relative` keeps absolutely-positioned sr-only header text inside the
+    // scroller — without it the label escapes to <body> and widens the page.
+    <div className="relative overflow-x-auto" data-testid={testId}>
       <p className="mb-2 text-xs text-neutral-500">
         Emissions are Google&apos;s per-passenger CO₂e estimate compared with a typical flight on this route.
         Click a row for legroom, aircraft and layover details.

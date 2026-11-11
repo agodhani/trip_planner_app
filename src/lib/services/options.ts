@@ -3,8 +3,10 @@ import { and, desc, eq, inArray, ne } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { comments, optionVotes, tripOptions, trips, users } from '@/lib/db/schema';
 import { compareDataFor } from '@/lib/domain/compare';
+import { tripWindowForSelection } from '@/lib/domain/trip-window';
 import { assertTripRole, NotFoundError } from './access';
 import { recordEvent, touchTrip, type Tx } from './events';
+import { tripDays } from './itinerary';
 
 export type OptionStatus = 'shortlisted' | 'selected' | 'booked' | 'rejected';
 
@@ -83,12 +85,24 @@ export async function setOptionStatus(
       await tx.update(tripOptions).set({ status: 'shortlisted' })
         .where(and(eq(tripOptions.tripId, tripId), eq(tripOptions.kind, opt[0].kind), eq(tripOptions.status, 'selected'), ne(tripOptions.id, optionId)));
     }
-    // Selected flight anchors the trip dates.
+    // Selected flight anchors the trip dates. A one-way option (no return
+    // leg) keeps the established window end — explicit dates win, otherwise
+    // the strategy-derived window — so the board never drops later days.
     if (status === 'selected' && opt[0].kind === 'flight') {
-      const data = opt[0].data as { outbound?: { departLocal: string }; return?: { arriveLocal: string } };
-      const start = data.outbound?.departLocal?.slice(0, 10) ?? null;
-      const end = (data.return?.arriveLocal ?? data.outbound?.departLocal)?.slice(0, 10) ?? null;
-      await tx.update(trips).set({ startDate: start, endDate: end }).where(eq(trips.id, tripId));
+      const data = opt[0].data as { outbound?: { departLocal?: string }; return?: { arriveLocal?: string } };
+      const [trip] = await tx.select().from(trips).where(eq(trips.id, tripId)).limit(1);
+      const range = trip ? tripDays(trip) : null;
+      const next = tripWindowForSelection(
+        {
+          departDay: data.outbound?.departLocal?.slice(0, 10) ?? null,
+          returnDay: data.return?.arriveLocal?.slice(0, 10) ?? null,
+        },
+        {
+          start: trip?.startDate ?? range?.start ?? null,
+          end: trip?.endDate ?? range?.end ?? null,
+        },
+      );
+      await tx.update(trips).set(next).where(eq(trips.id, tripId));
     }
     await tx.update(tripOptions)
       .set({ status, bookingRef: bookingRef ?? opt[0].bookingRef, updatedAt: new Date() })

@@ -15,7 +15,7 @@ export default async function SettingsPage() {
       <AppNav user={user} />
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8">
         <h1 className="mb-6 text-2xl font-bold">Settings</h1>
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
           <section className={cardCls}>
             <h2 className="mb-4 font-semibold">Profile</h2>
             <ProfileForm

@@ -18,17 +18,22 @@ const TABS = [
   { slug: 'people', label: 'People' },
 ];
 
-export function TripTabs({ tripId, done = {}, shortlistCount = 0, live = false }: {
+export function TripTabs({ tripId, done = {}, shortlistCount = 0, live = false, recap = false }: {
   tripId: string;
   done?: { flights?: boolean; stay?: boolean };
   shortlistCount?: number;
   /** Trip is live (today inside the window, or in_progress) — show Today first. */
   live?: boolean;
+  /** Trip has a story to tell (outcomes/journal/expenses, or past-planning status). */
+  recap?: boolean;
 }) {
   const pathname = usePathname();
   const { unseenTabs } = useTripPulse();
   const base = `/trips/${tripId}`;
-  const tabs = live ? [{ slug: 'today', label: 'Today' }, ...TABS] : TABS;
+  const tabs = [...TABS];
+  // Recap is the final chapter — it sits right after Log, before People.
+  if (recap) tabs.splice(tabs.findIndex((t) => t.slug === 'log') + 1, 0, { slug: 'recap', label: 'Recap' });
+  if (live) tabs.unshift({ slug: 'today', label: 'Today' });
   return (
     <nav className="flex gap-1 overflow-x-auto border-b border-neutral-200" aria-label="Trip sections" data-no-print>
       {tabs.map((t) => {

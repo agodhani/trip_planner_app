@@ -51,7 +51,10 @@ export default async function TripOverviewPage({
   );
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+    // minmax(0,…) caps tracks at the container width — a plain `1fr`/`auto`
+    // track would grow to an item's max-content (nowrap checklist text) and
+    // push the page past the viewport on mobile.
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="flex flex-col gap-6">
         {live && (
           <Link

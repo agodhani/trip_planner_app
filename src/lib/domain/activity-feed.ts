@@ -13,6 +13,7 @@ export type PulseTab =
   | 'itinerary'
   | 'budget'
   | 'log'
+  | 'recap'
   | 'shortlist'
   | 'people'
   | 'overview';
@@ -26,6 +27,7 @@ export const TAB_LABEL: Record<PulseTab, string> = {
   itinerary: 'Itinerary',
   budget: 'Budget',
   log: 'Log',
+  recap: 'Recap',
   shortlist: 'Shortlist',
   people: 'People',
   overview: 'Overview',

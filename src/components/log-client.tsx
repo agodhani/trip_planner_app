@@ -1,6 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { useActionState, useState, useTransition } from 'react';
+import { BookOpenText } from 'lucide-react';
 import { itemOutcomeAction, journalAction, tripStatusAction } from '@/lib/actions/budget';
 import type { ActionState } from '@/lib/actions/people';
 import { ui } from '@/components/shortlisted-options';
@@ -55,9 +57,11 @@ function LogRow({ i, tripId, canEdit }: { i: Item; tripId: string; canEdit: bool
   );
 }
 
-export function LogClient({ tripId, canEdit, status, items, journal, days, defaultDay }: {
+export function LogClient({ tripId, canEdit, status, items, journal, days, defaultDay, recapReady }: {
   tripId: string; canEdit: boolean; status: string; days: string[]; defaultDay: string;
   items: Item[]; journal: { id: string; day: string | null; body: string }[];
+  /** A story already exists — link through to the read-only Recap. */
+  recapReady: boolean;
 }) {
   const [jState, jAction] = useActionState<ActionState, FormData>(journalAction, {});
   const dayName = (d: string | null) => {
@@ -71,6 +75,16 @@ export function LogClient({ tripId, canEdit, status, items, journal, days, defau
 
   return (
     <div className="flex flex-col gap-6">
+      {recapReady && (
+        <Link
+          href={`/trips/${tripId}/recap`}
+          data-testid="log-recap-link"
+          className="flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-medium text-teal-800 hover:bg-teal-100"
+        >
+          <BookOpenText aria-hidden className="h-4 w-4" />
+          See the trip recap — the story so far, ready to print or share
+        </Link>
+      )}
       <section className={card}>
         <h2 className="font-semibold">Trip status</h2>
         <p className="mb-2 text-xs text-neutral-500">Moves the trip between sections on your trips list.</p>

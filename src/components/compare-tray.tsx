@@ -194,7 +194,7 @@ export function CompareTray({
                 Close
               </button>
             </div>
-            <div className="overflow-auto p-4">
+            <div className="relative overflow-auto p-4">
               <table className="w-full min-w-[34rem] border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-neutral-200 text-left">

@@ -30,14 +30,16 @@ export default async function PeoplePage({
   const memberNames = new Map(members.map((m) => [m.userId, m.name]));
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    // minmax(0,…) caps the base track at container width (long member names or
+    // invite URLs must not push the page past the viewport).
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
       <section className={cardCls}>
         <h2 className="mb-3 font-semibold">Members</h2>
         <ul className="flex flex-col gap-3">
           {members.map((m) => (
             <li
               key={m.userId}
-              className="flex items-center justify-between gap-3"
+              className="flex flex-wrap items-center justify-between gap-3"
             >
               <div>
                 <p className="text-sm font-medium">
@@ -77,7 +79,7 @@ export default async function PeoplePage({
                 {invites.map((i) => (
                   <li
                     key={i.id}
-                    className="flex items-center justify-between gap-2 text-sm"
+                    className="flex flex-wrap items-center justify-between gap-2 text-sm"
                   >
                     <span>
                       {i.role} · expires {formatDate(i.expiresAt, user.homeTimezone)} ·{' '}
