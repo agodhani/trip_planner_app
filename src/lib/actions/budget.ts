@@ -92,6 +92,7 @@ export async function itemOutcomeAction(formData: FormData): Promise<void> {
   const { user } = await requireTripRole(tripId, 'editor');
   await setItemOutcome(user, tripId, itemId, outcome, String(formData.get('notes') || '') || null, rating);
   revalidatePath(`/trips/${tripId}/log`);
+  revalidatePath(`/trips/${tripId}/today`); // the Today screen shows outcomes
 }
 
 export async function journalAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

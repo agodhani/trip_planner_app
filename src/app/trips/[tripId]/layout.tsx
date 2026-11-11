@@ -2,7 +2,10 @@ import { AppNav } from '@/components/app-nav';
 import { MemberAvatars, TripPulse } from '@/components/trip-pulse';
 import { TripTabs } from '@/components/trip-tabs';
 import { requireTripRole } from '@/lib/auth/guards';
+import { todayISO } from '@/lib/clock';
 import { describeStrategy } from '@/lib/domain/dates/strategy';
+import { safeZone, tripLive, tripPhase } from '@/lib/domain/today';
+import { tripDays } from '@/lib/services/itinerary';
 import { tripProgress } from '@/lib/services/progress';
 import { latestEventId } from '@/lib/services/pulse';
 import { getTrip, listMemberUsers } from '@/lib/services/trips';
@@ -35,6 +38,13 @@ export default async function TripLayout({
   ]);
   const state = Object.fromEntries(progress.steps.map((s) => [s.key, s.state]));
   const travelers = trip.adults + trip.childrenAges.length;
+  // "Today" is live when the destination-local date sits inside the trip
+  // window, or the trip was marked in_progress.
+  const range = tripDays(trip);
+  const live = tripLive(
+    trip.status,
+    tripPhase(range, todayISO(safeZone(trip.destination.timezone))),
+  );
 
   return (
     <TripPulse
@@ -65,6 +75,7 @@ export default async function TripLayout({
               tripId={trip.id}
               done={{ flights: state.flights === 'done', stay: state.stay === 'done' }}
               shortlistCount={progress.shortlistCount}
+              live={live}
             />
           </div>
         </div>

@@ -22,6 +22,14 @@ export function tripDays(trip: TripRow): { start: string; end: string; days: str
   if (trip.startDate && trip.endDate) {
     return { start: trip.startDate, end: trip.endDate, days: dayList(trip.startDate, trip.endDate) };
   }
+  // Exact dates are the trip's own days — keep them even once under way.
+  // candidatePairs drops departs before today, which would erase the board
+  // mid-trip (and the Today screen relies on this window).
+  if (trip.dateStrategy.kind === 'exact') {
+    const s = trip.dateStrategy;
+    const end = s.returnDate ?? s.departDate;
+    return { start: s.departDate, end, days: dayList(s.departDate, end) };
+  }
   const pairs = candidatePairs(trip.dateStrategy, todayISO('UTC'), env.FLIGHT_SCAN_MAX_PAIRS);
   const p = pairs.ok ? pairs.pairs[0] : undefined;
   if (p?.back) {

@@ -5,6 +5,7 @@
  */
 
 export type PulseTab =
+  | 'today'
   | 'flights'
   | 'stay'
   | 'activities'
@@ -17,6 +18,7 @@ export type PulseTab =
   | 'overview';
 
 export const TAB_LABEL: Record<PulseTab, string> = {
+  today: 'Today',
   flights: 'Flights',
   stay: 'Stay',
   activities: 'Activities',

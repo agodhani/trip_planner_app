@@ -463,6 +463,64 @@ function ItineraryBoard({ tripId, canEdit, days, items, legs, pool, currency }: 
         onDragCancel={() => setActiveItem(null)}
       >
         <div className="flex items-start gap-3 overflow-x-auto pb-2" data-no-print>
+          {/* The Unscheduled tray renders first so it is on-screen on mobile
+              (it used to trail the day columns, off-screen to the right). */}
+          <Column
+            day={null} isPool itemIds={poolItems.map((i) => i.id)} count={poolItems.length}
+            heading="Unscheduled"
+          >
+            {canEdit && pool.length > 0 && (
+              <ul className="flex flex-col gap-2 text-sm">
+                {pool.map((o) => (
+                  <li key={o.id}>
+                    <form action={aAction} className="flex flex-col gap-1.5 rounded-lg border border-neutral-200 p-2">
+                      <HiddenIds tripId={tripId} section="itinerary" optionId={o.id} />
+                      <input type="hidden" name="kind" value="activity" /><input type="hidden" name="title" value={o.title} />
+                      {o.lat != null && <><input type="hidden" name="lat" value={o.lat} /><input type="hidden" name="lon" value={o.lon ?? 0} /></>}
+                      <span className="truncate font-medium" title={o.title}>{o.title}</span>
+                      {o.closedNote && <span className="text-xs text-amber-700">{o.closedNote}</span>}
+                      <span className="flex gap-1.5">
+                        <select name="day" aria-label={`Day for ${o.title}`} className={`${inp} min-w-0 flex-1 text-xs`} defaultValue="">
+                          <option value="">Unscheduled</option>
+                          {days.map((d, i) => (
+                            <option key={d} value={d}>
+                              Day {i + 1} · {dayLabel(d)}{o.closedDays.includes(d) ? ' · closed' : ''}
+                            </option>
+                          ))}
+                        </select>
+                        <SubmitButton className={btn2}>Add</SubmitButton>
+                      </span>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {poolItems.map((it) => (
+              <SortableCard key={it.id} it={it} canEdit={canEdit} tripId={tripId} days={days} currency={currency} onDelete={applyDelete} />
+            ))}
+            {poolItems.length === 0 && !(canEdit && pool.length > 0) && (
+              <p className="py-4 text-center text-xs text-neutral-400">Nothing unscheduled.</p>
+            )}
+            {canEdit && (
+              <form action={aAction} className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-2 text-sm">
+                <input type="hidden" name="tripId" value={tripId} />
+                <p className="text-xs font-medium text-neutral-600">Add your own item</p>
+                <input name="title" placeholder="Title" aria-label="Title" required className={inp} />
+                <div className="flex gap-2">
+                  <select name="kind" aria-label="Type" className={`${inp} flex-1`}>
+                    <option value="activity">Activity</option><option value="meal">Meal</option><option value="transport">Transport</option><option value="custom">Note</option>
+                  </select>
+                  <select name="day" aria-label="Day" className={`${inp} flex-1`}>
+                    <option value="">Unscheduled</option>{dayOptions}
+                  </select>
+                </div>
+                <input name="notes" placeholder="Notes (optional)" aria-label="Notes" className={inp} />
+                <SubmitButton className={btn}>Add item</SubmitButton>
+                {aState.error && <p className="text-xs text-red-600">{aState.error}</p>}
+              </form>
+            )}
+          </Column>
+
           {days.map((d, di) => {
             const col = columnItems(d);
             const flags = dayTiming(col, legs);
@@ -529,62 +587,6 @@ function ItineraryBoard({ tripId, canEdit, days, items, legs, pool, currency }: 
               </Column>
             );
           })}
-
-          <Column
-            day={null} isPool itemIds={poolItems.map((i) => i.id)} count={poolItems.length}
-            heading="Unscheduled"
-          >
-            {canEdit && pool.length > 0 && (
-              <ul className="flex flex-col gap-2 text-sm">
-                {pool.map((o) => (
-                  <li key={o.id}>
-                    <form action={aAction} className="flex flex-col gap-1.5 rounded-lg border border-neutral-200 p-2">
-                      <HiddenIds tripId={tripId} section="itinerary" optionId={o.id} />
-                      <input type="hidden" name="kind" value="activity" /><input type="hidden" name="title" value={o.title} />
-                      {o.lat != null && <><input type="hidden" name="lat" value={o.lat} /><input type="hidden" name="lon" value={o.lon ?? 0} /></>}
-                      <span className="truncate font-medium" title={o.title}>{o.title}</span>
-                      {o.closedNote && <span className="text-xs text-amber-700">{o.closedNote}</span>}
-                      <span className="flex gap-1.5">
-                        <select name="day" aria-label={`Day for ${o.title}`} className={`${inp} min-w-0 flex-1 text-xs`} defaultValue="">
-                          <option value="">Unscheduled</option>
-                          {days.map((d, i) => (
-                            <option key={d} value={d}>
-                              Day {i + 1} · {dayLabel(d)}{o.closedDays.includes(d) ? ' · closed' : ''}
-                            </option>
-                          ))}
-                        </select>
-                        <SubmitButton className={btn2}>Add</SubmitButton>
-                      </span>
-                    </form>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {poolItems.map((it) => (
-              <SortableCard key={it.id} it={it} canEdit={canEdit} tripId={tripId} days={days} currency={currency} onDelete={applyDelete} />
-            ))}
-            {poolItems.length === 0 && !(canEdit && pool.length > 0) && (
-              <p className="py-4 text-center text-xs text-neutral-400">Nothing unscheduled.</p>
-            )}
-            {canEdit && (
-              <form action={aAction} className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-2 text-sm">
-                <input type="hidden" name="tripId" value={tripId} />
-                <p className="text-xs font-medium text-neutral-600">Add your own item</p>
-                <input name="title" placeholder="Title" aria-label="Title" required className={inp} />
-                <div className="flex gap-2">
-                  <select name="kind" aria-label="Type" className={`${inp} flex-1`}>
-                    <option value="activity">Activity</option><option value="meal">Meal</option><option value="transport">Transport</option><option value="custom">Note</option>
-                  </select>
-                  <select name="day" aria-label="Day" className={`${inp} flex-1`}>
-                    <option value="">Unscheduled</option>{dayOptions}
-                  </select>
-                </div>
-                <input name="notes" placeholder="Notes (optional)" aria-label="Notes" className={inp} />
-                <SubmitButton className={btn}>Add item</SubmitButton>
-                {aState.error && <p className="text-xs text-red-600">{aState.error}</p>}
-              </form>
-            )}
-          </Column>
         </div>
 
         <DragOverlay>

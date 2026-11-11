@@ -16,6 +16,10 @@ const board = (page: Page) => page.locator('div.flex.items-start.gap-3.overflow-
  * then drop on it.
  */
 async function dragTo(page: Page, title: string, target: Locator) {
+  // Bring the target column into the strip's viewport first — horizontal
+  // visibility is per-column, so a same-column target becomes visible with
+  // its card; a cross-column target still needs the edge-hover loop below.
+  await target.scrollIntoViewIfNeeded();
   const handle = page.getByLabel(`Drag ${title} to another day or position`);
   await handle.scrollIntoViewIfNeeded();
   await expect(handle).toBeVisible();
@@ -24,15 +28,20 @@ async function dragTo(page: Page, title: string, target: Locator) {
   await page.mouse.down();
   await page.mouse.move(h.x + h.width / 2 + 12, h.y + h.height / 2, { steps: 3 });
   const bb = (await board(page).boundingBox())!;
-  for (let i = 0; i < 40; i++) {
-    const t = await target.boundingBox();
+  let t = await target.boundingBox();
+  for (let i = 0; i < 80; i++) {
     if (t && t.x >= bb.x && t.x + t.width <= bb.x + bb.width) break;
     const center = t ? t.x + t.width / 2 : 0;
     const edgeX = center < bb.x ? bb.x + 24 : bb.x + bb.width - 24;
     await page.mouse.move(edgeX, bb.y + bb.height / 2, { steps: 3 });
     await page.waitForTimeout(120);
+    t = await target.boundingBox();
   }
-  const t = (await target.boundingBox())!;
+  // Fail loudly rather than dropping at a clamped edge position — an
+  // off-viewport drop point lands on the wrong column (off-by-one day).
+  if (!t || t.x < bb.x || t.x + t.width > bb.x + bb.width) {
+    throw new Error(`drag target never became fully visible in the board strip`);
+  }
   await page.mouse.move(t.x + t.width / 2, t.y + Math.min(40, t.height / 2), { steps: 8 });
   await page.mouse.up();
 }

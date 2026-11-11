@@ -47,7 +47,7 @@ export function useTripPulse(): PulseContextValue {
 }
 
 const ROUTE_TABS: ReadonlySet<string> = new Set([
-  'flights', 'stay', 'activities', 'transport', 'itinerary',
+  'today', 'flights', 'stay', 'activities', 'transport', 'itinerary',
   'budget', 'log', 'shortlist', 'people',
 ]);
 

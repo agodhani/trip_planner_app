@@ -14,7 +14,9 @@ test('itinerary: custom items, move to a day, edit details, manual leg without c
 
   // Move the unscheduled item onto the first day via its day select.
   await page.getByLabel('Move to day').first().selectOption({ index: 1 });
-  const day1 = page.locator('section', { hasText: 'Day 1' }).first();
+  // Match by heading, not hasText — the Unscheduled column's day selects
+  // contain "Day 1" option text and now render first.
+  const day1 = page.locator('section').filter({ has: page.getByRole('heading', { name: /Day 1\b/ }) }).first();
   await expect(day1.getByText('E2E Alfama walk')).toBeVisible({ timeout: 15_000 });
 
   // Edit details are tucked behind the pencil; empty cost stays empty (no stray 0).

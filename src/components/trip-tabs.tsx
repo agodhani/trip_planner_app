@@ -18,17 +18,20 @@ const TABS = [
   { slug: 'people', label: 'People' },
 ];
 
-export function TripTabs({ tripId, done = {}, shortlistCount = 0 }: {
+export function TripTabs({ tripId, done = {}, shortlistCount = 0, live = false }: {
   tripId: string;
   done?: { flights?: boolean; stay?: boolean };
   shortlistCount?: number;
+  /** Trip is live (today inside the window, or in_progress) — show Today first. */
+  live?: boolean;
 }) {
   const pathname = usePathname();
   const { unseenTabs } = useTripPulse();
   const base = `/trips/${tripId}`;
+  const tabs = live ? [{ slug: 'today', label: 'Today' }, ...TABS] : TABS;
   return (
     <nav className="flex gap-1 overflow-x-auto border-b border-neutral-200" aria-label="Trip sections" data-no-print>
-      {TABS.map((t) => {
+      {tabs.map((t) => {
         const href = t.slug ? `${base}/${t.slug}` : base;
         const active =
           t.slug === '' ? pathname === base : pathname.startsWith(href);

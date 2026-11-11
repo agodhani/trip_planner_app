@@ -2,9 +2,12 @@ import Link from 'next/link';
 import { ArrowRight, CheckCircle2, Circle, CircleDot } from 'lucide-react';
 import { CommentForm } from '@/components/comment-form';
 import { requireTripRole } from '@/lib/auth/guards';
+import { todayISO } from '@/lib/clock';
 import type { StepKey, StepState } from '@/lib/domain/progress';
+import { safeZone, tripLive, tripPhase } from '@/lib/domain/today';
 import { formatDateTime } from '@/lib/format';
 import { listActivity, listTripComments } from '@/lib/services/comments';
+import { tripDays } from '@/lib/services/itinerary';
 import { tripProgress } from '@/lib/services/progress';
 import { getTrip } from '@/lib/services/trips';
 import { notFound } from 'next/navigation';
@@ -40,10 +43,30 @@ export default async function TripOverviewPage({
   ]);
   const next = progress.next ? progress.steps.find((s) => s.key === progress.next)! : null;
   const doneCount = progress.steps.filter((s) => s.state === 'done').length;
+  // Same window as the Today tab: destination-local today inside the trip
+  // window, or a trip marked in_progress.
+  const live = tripLive(
+    trip.status,
+    tripPhase(tripDays(trip), todayISO(safeZone(trip.destination.timezone))),
+  );
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
       <div className="flex flex-col gap-6">
+        {live && (
+          <Link
+            href={`/trips/${tripId}/today`}
+            className="flex items-center justify-between gap-3 rounded-xl bg-teal-600 px-4 py-3 text-white shadow-sm hover:bg-teal-700"
+          >
+            <span>
+              <span className="block text-xs font-medium uppercase tracking-wide text-teal-100">Trip is live</span>
+              <span className="block font-semibold">Open Today — the running plan for right now</span>
+            </span>
+            <span className="flex items-center gap-1 font-medium">
+              Open Today <ArrowRight aria-hidden className="h-4 w-4" />
+            </span>
+          </Link>
+        )}
         <section className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
           <div className="mb-3 flex items-baseline justify-between gap-2">
             <h2 className="font-semibold">Planning checklist</h2>

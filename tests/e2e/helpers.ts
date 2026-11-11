@@ -35,3 +35,20 @@ export async function createTripWeekendsInNov2026(page: Page) {
   await page.getByRole('button', { name: 'Create trip' }).click();
   await expect(page).toHaveURL(/\/trips\/[0-9a-f-]{36}$/);
 }
+
+/**
+ * Exact-dates trip. With TP_TEST_NOW pinned at 2026-10-30T12:00Z, calling
+ * with '2026-10-29'/'2026-11-01' makes "today" Day 2 — deterministic for the
+ * Today screen spec. (0 candidate pairs is fine; the trip still submits.)
+ */
+export async function createTripExactDates(page: Page, depart: string, ret: string) {
+  await page.goto('/trips/new');
+  await pickPlace(page, 'From', 'new york', 'New York, US');
+  await pickPlace(page, 'To', 'lisbon', 'Lisbon, PT');
+  await page.getByRole('button', { name: 'Exact dates' }).click();
+  await page.getByLabel('Depart', { exact: true }).fill(depart);
+  await page.getByLabel('Return', { exact: true }).fill(ret);
+  await expect(page.getByTestId('strategy-summary')).toContainText('Exact dates');
+  await page.getByRole('button', { name: 'Create trip' }).click();
+  await expect(page).toHaveURL(/\/trips\/[0-9a-f-]{36}$/);
+}
