@@ -2,6 +2,7 @@ import 'server-only';
 import { and, desc, eq, inArray, ne } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { comments, optionVotes, tripOptions, trips, users } from '@/lib/db/schema';
+import { compareDataFor } from '@/lib/domain/compare';
 import { assertTripRole, NotFoundError } from './access';
 import { recordEvent, touchTrip, type Tx } from './events';
 
@@ -164,6 +165,8 @@ export type OptionPanelItem = {
   price: number | null; currency: string | null; bookingUrl: string | null;
   bookingRef: string | null; source: string; externalId: string | null;
   kind: string;
+  /** Slimmed-down jsonb for the compare sheet (see compareDataFor). */
+  data: unknown;
   votes: { score: number; voters: { name: string; value: number }[] };
   comments: { id: string; body: string; author: string }[];
 };
@@ -177,7 +180,7 @@ export async function optionPanel(tripId: string, kind: string): Promise<OptionP
     id: o.id, title: o.title, subtitle: o.subtitle, status: o.status,
     price: o.priceAmount ? Number(o.priceAmount) : null, currency: o.priceCurrency,
     bookingUrl: o.bookingUrl, bookingRef: o.bookingRef, source: o.source,
-    externalId: o.externalId, kind: o.kind,
+    externalId: o.externalId, kind: o.kind, data: compareDataFor(o.kind, o.data),
     votes: votes.get(o.id) ?? { score: 0, voters: [] },
     comments: commentRows
       .filter((c) => c.optionId === o.id)

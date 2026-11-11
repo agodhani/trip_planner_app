@@ -7,6 +7,7 @@ import {
 } from '@/lib/actions/options';
 import type { ActionState } from '@/lib/actions/people';
 import { SubmitButton } from '@/components/submit-button';
+import { CompareToggle, CompareTray } from '@/components/compare-tray';
 import { money } from '@/lib/ui-format';
 
 export type ShortlistedOption = {
@@ -14,6 +15,8 @@ export type ShortlistedOption = {
   price: number | null; currency: string | null; bookingUrl: string | null;
   bookingRef: string | null; source: string; externalId?: string | null;
   kind?: string;
+  /** Slimmed trip_options.data — powers the compare sheet. */
+  data?: unknown;
   votes: { score: number; voters: { name: string; value: number }[] };
   comments: { id: string; body: string; author: string }[];
 };
@@ -54,9 +57,13 @@ export function ShortlistedOptions({
   const [cState, cAction] = useActionState<ActionState, FormData>(optionCommentAction, {});
   if (!options.length) return null;
   return (
+    <CompareTray tripId={tripId} section={section} canEdit={canEdit} options={options}>
     <section className={card}>
       <h2 className="font-semibold">{title}</h2>
-      <p className="mb-3 text-xs text-neutral-500">Vote and comment together, then Select the one you want — it feeds the budget and itinerary.</p>
+      <p className="mb-3 text-xs text-neutral-500">
+        Vote and comment together, then Select the one you want — it feeds the budget and itinerary.
+        {options.length > 1 && ' Tick Compare on 2–3 cards to see them side by side.'}
+      </p>
       <ul className="flex flex-col gap-3">
         {options.map((o) => {
           const ups = o.votes.voters.filter((v) => v.value === 1);
@@ -76,6 +83,7 @@ export function ShortlistedOptions({
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
+                  {options.length > 1 && <CompareToggle optionId={o.id} />}
                   {o.price !== null && <span className="mr-1 text-sm font-semibold">{money(o.price, o.currency ?? 'USD')}</span>}
                   <form action={voteAction}>
                     <HiddenIds tripId={tripId} section={section} optionId={o.id} /><input type="hidden" name="value" value="1" />
@@ -140,5 +148,6 @@ export function ShortlistedOptions({
         })}
       </ul>
     </section>
+    </CompareTray>
   );
 }
