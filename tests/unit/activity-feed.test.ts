@@ -38,6 +38,10 @@ describe('eventTab', () => {
     expect(eventTab('itinerary.anchors_synced')).toBe('itinerary');
     expect(eventTab('transport.legs_computed')).toBe('transport');
     expect(eventTab('flights.scan_finished')).toBe('flights');
+    // Price-watch events land on the Shortlist tab where the chips render.
+    expect(eventTab('flights.prices_checked')).toBe('shortlist');
+    expect(eventTab('flights.price_drop')).toBe('shortlist');
+    expect(eventTab('flights.scan_started')).toBe('flights');
     expect(eventTab('member.joined')).toBe('people');
     expect(eventTab('invite.created')).toBe('people');
     expect(eventTab('traveler.renamed')).toBe('people');

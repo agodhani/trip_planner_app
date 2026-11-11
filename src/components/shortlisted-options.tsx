@@ -1,16 +1,27 @@
 'use client';
 
-import { useActionState, useState } from 'react';
-import { ExternalLink, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react';
+import { useActionState, useState, type ReactNode } from 'react';
+import { ExternalLink, RefreshCw, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react';
 import {
   deleteOptionAction, optionCommentAction, optionStatusAction, restoreOptionAction, voteAction,
 } from '@/lib/actions/options';
+import { refreshPricesAction } from '@/lib/actions/price-watch';
 import type { ActionState } from '@/lib/actions/people';
 import { SubmitButton } from '@/components/submit-button';
 import { CompareToggle, CompareTray } from '@/components/compare-tray';
 import { MarkBookedControl } from '@/components/mark-booked';
 import { useToast } from '@/components/toaster';
-import { money } from '@/lib/ui-format';
+import { priceDelta } from '@/lib/domain/price-watch';
+import { money, timeAgo } from '@/lib/ui-format';
+
+export type PriceCheck = {
+  checkedAt: string;
+  /** null = still listed but currently unpriced. */
+  priceCents: number | null;
+  currency: string | null;
+  /** false = no longer listed. */
+  available: boolean;
+};
 
 export type ShortlistedOption = {
   id: string; title: string; subtitle: string | null; status: string;
@@ -19,6 +30,8 @@ export type ShortlistedOption = {
   kind?: string;
   /** Slimmed trip_options.data — powers the compare sheet. */
   data?: unknown;
+  /** Latest Price Watch row; null when never checked. */
+  priceCheck?: PriceCheck | null;
   votes: { score: number; voters: { name: string; value: number }[] };
   comments: { id: string; body: string; author: string }[];
 };
@@ -91,6 +104,58 @@ function RemoveOptionButton({ tripId, section, optionId, title }: {
   );
 }
 
+/**
+ * Price Watch line under a flight option's frozen price: the delta vs the
+ * shortlist baseline when the currencies match, "no longer listed" when it
+ * vanished from the results, and when the last check ran.
+ */
+function PriceWatchLine({ o }: { o: ShortlistedOption }) {
+  const c = o.priceCheck!;
+  const chip = (cls: string, text: string, title?: string) => (
+    <span className={`rounded px-1.5 py-0.5 font-medium ${cls}`} title={title}>{text}</span>
+  );
+  let verdict: ReactNode = null;
+  if (!c.available) {
+    verdict = chip('bg-amber-50 text-amber-800', 'no longer listed');
+  } else if (c.priceCents === null) {
+    verdict = chip('bg-neutral-100 text-neutral-400', '—', 'Still listed, but no current price');
+  } else {
+    const cur = c.currency ?? 'USD';
+    const nowPrice = money(c.priceCents / 100, cur);
+    const baselineCents = o.price !== null ? Math.round(o.price * 100) : null;
+    const sameCur = baselineCents !== null && (o.currency ?? 'USD') === cur;
+    if (sameCur) {
+      const d = priceDelta(baselineCents, c.priceCents);
+      if (d.pct === null || Math.abs(d.pct) < 0.05) {
+        verdict = chip('bg-neutral-100 text-neutral-600', '±0%', `Unchanged at ${nowPrice}`);
+      } else if (d.pct < 0) {
+        verdict = chip(
+          'bg-teal-50 text-teal-700', `−${Math.abs(d.pct).toFixed(1)}%`,
+          `Dropped to ${nowPrice} — was ${money(baselineCents / 100, cur)} when shortlisted`,
+        );
+      } else {
+        verdict = chip(
+          'bg-amber-50 text-amber-800', `+${d.pct.toFixed(1)}%`,
+          `Up to ${nowPrice} — was ${money(baselineCents / 100, cur)} when shortlisted`,
+        );
+      }
+    } else {
+      verdict = chip(
+        'bg-neutral-100 text-neutral-700', `now ${nowPrice}`,
+        baselineCents === null
+          ? 'No baseline price was recorded when shortlisted'
+          : 'Provider quotes a different currency — compare at booking',
+      );
+    }
+  }
+  return (
+    <span className="mt-0.5 flex items-center justify-end gap-1.5 text-xs">
+      {verdict}
+      <span className="text-neutral-400">checked {timeAgo(c.checkedAt)}</span>
+    </span>
+  );
+}
+
 /** Shortlisted options list: votes, status flow, comments — shared across tabs. */
 export function ShortlistedOptions({
   tripId, section, title = 'Shortlisted', canEdit, options,
@@ -102,11 +167,24 @@ export function ShortlistedOptions({
   options: ShortlistedOption[];
 }) {
   const [cState, cAction] = useActionState<ActionState, FormData>(optionCommentAction, {});
+  const [pwState, pwAction] = useActionState<ActionState, FormData>(refreshPricesAction, {});
   if (!options.length) return null;
+  const watchable = options.some((o) => o.kind === 'flight' && o.source === 'google_flights');
   return (
     <CompareTray tripId={tripId} section={section} canEdit={canEdit} options={options}>
     <section className={card}>
-      <h2 className="font-semibold">{title}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-semibold">{title}</h2>
+        {canEdit && watchable && (
+          <form action={pwAction}>
+            <input type="hidden" name="tripId" value={tripId} />
+            <SubmitButton className={btn2} title="Re-check current prices for shortlisted Google Flights">
+              <RefreshCw aria-hidden className="h-3 w-3" />Check prices
+            </SubmitButton>
+          </form>
+        )}
+      </div>
+      {pwState.error && <p role="alert" className="mt-1 text-xs text-red-600">{pwState.error}</p>}
       <p className="mb-3 text-xs text-neutral-500">
         Vote and comment together, then Select the one you want — it feeds the budget and itinerary.
         {options.length > 1 && ' Tick Compare on 2–3 cards to see them side by side.'}
@@ -131,7 +209,14 @@ export function ShortlistedOptions({
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
                   {options.length > 1 && <CompareToggle optionId={o.id} />}
-                  {o.price !== null && <span className="mr-1 text-sm font-semibold">{money(o.price, o.currency ?? 'USD')}</span>}
+                  {(o.price !== null || o.priceCheck) && (
+                    <span className="mr-1 text-right">
+                      {o.price !== null && (
+                        <span className="block text-sm font-semibold">{money(o.price, o.currency ?? 'USD')}</span>
+                      )}
+                      {o.priceCheck && <PriceWatchLine o={o} />}
+                    </span>
+                  )}
                   <form action={voteAction}>
                     <HiddenIds tripId={tripId} section={section} optionId={o.id} /><input type="hidden" name="value" value="1" />
                     <SubmitButton className={btn2} aria-label="Vote up" title={ups.length ? `Up: ${ups.map((v) => v.name).join(', ')}` : 'Vote up'}>

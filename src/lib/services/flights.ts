@@ -36,6 +36,29 @@ export function paxFromTrip(trip: { adults: number; childrenAges: number[] }, ad
   return { adults: trip.adults + seats, children, infantsInSeat: 0, infantsOnLap: lap };
 }
 
+/**
+ * The shared Google Flights request base for a trip — identical fields mean
+ * identical cache keys, so scans, pair views and price-watch refreshes all
+ * share provider_cache entries (and fixture replays).
+ */
+export function flightRequestBase(
+  trip: {
+    origin: { airports: string[] }; destination: { airports: string[] };
+    adults: number; childrenAges: number[]; cabin: FlightSearchRequest['cabin'];
+    maxStops: FlightSearchRequest['maxStops']; currency: string;
+  },
+  adultsOnly = false,
+): Omit<FlightSearchRequest, 'outboundDate' | 'returnDate'> {
+  return {
+    originAirports: trip.origin.airports,
+    destinationAirports: trip.destination.airports,
+    ...paxFromTrip(trip, adultsOnly),
+    cabin: trip.cabin,
+    maxStops: trip.maxStops,
+    currency: trip.currency,
+  };
+}
+
 
 /** Summarize one pair from fetched itineraries + filters (pure, tested). */
 export function summarizePair(
@@ -198,11 +221,7 @@ export async function startScan(
   if (!trip) throw new NotFoundError();
   const pairs = candidatePairs(trip.dateStrategy, todayISO(user.homeTimezone), env.FLIGHT_SCAN_MAX_PAIRS);
   if (!pairs.ok) throw new Error(pairs.error);
-  const base = {
-    originAirports: trip.origin.airports, destinationAirports: trip.destination.airports,
-    ...paxFromTrip(trip, adultsOnly),
-    cabin: trip.cabin, maxStops: trip.maxStops, currency: trip.currency,
-  };
+  const base = flightRequestBase(trip, adultsOnly);
   const request = {
     tripId, userId: user.id, pairs: pairs.pairs, base,
     prefs: { tz: trip.timePrefs.timezone ?? user.homeTimezone, outboundDepart: trip.timePrefs.outboundDepart, returnDepart: trip.timePrefs.returnDepart },
@@ -233,18 +252,18 @@ export async function getSearch(id: string) {
   return rows[0] ?? null;
 }
 
+/** The adultsOnly flag the latest scan ran with — keeps pair fetches consistent. */
+async function latestAdultsOnly(tripId: string): Promise<boolean> {
+  const search = await latestSearch(tripId);
+  return (search?.request as { adultsOnly?: boolean } | undefined)?.adultsOnly ?? false;
+}
+
 /** Trip + passenger mix (matching the latest scan) for pair-level fetches. */
 async function searchContext(user: { id: string }, tripId: string) {
   await assertTripRole(tripId, user.id, 'viewer');
   const trip = await getTrip(tripId);
   if (!trip) throw new NotFoundError();
-  const search = await latestSearch(tripId);
-  const adultsOnly = (search?.request as { adultsOnly?: boolean } | undefined)?.adultsOnly ?? false;
-  const base = {
-    originAirports: trip.origin.airports, destinationAirports: trip.destination.airports,
-    ...paxFromTrip(trip, adultsOnly),
-    cabin: trip.cabin, maxStops: trip.maxStops, currency: trip.currency,
-  };
+  const base = flightRequestBase(trip, await latestAdultsOnly(tripId));
   return { trip, base };
 }
 

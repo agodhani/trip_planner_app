@@ -44,6 +44,28 @@ export function categoryForOptionKind(kind: string): ExpenseCategory {
 export type CategoryCaps = Partial<Record<ExpenseCategory, number>>;
 
 /**
+ * An option's stored price converted into base-currency cents. Same-currency
+ * is exact; a foreign price needs a fetched rate from `rates` (currency →
+ * units of base per 1 unit). A missing rate returns null — the caller must
+ * exclude the option from base rollups rather than mix currencies.
+ */
+export function optionPriceBaseCents(
+  priceAmount: number | null | undefined,
+  priceCurrency: string | null | undefined,
+  baseCurrency: string,
+  rates?: ReadonlyMap<string, number>,
+): number | null {
+  if (priceAmount === null || priceAmount === undefined || !Number.isFinite(priceAmount) || priceAmount <= 0) {
+    return null;
+  }
+  const cur = priceCurrency ?? baseCurrency;
+  if (cur === baseCurrency) return Math.round(priceAmount * 100);
+  const rate = rates?.get(cur);
+  if (rate === undefined || !Number.isFinite(rate) || rate <= 0) return null;
+  return Math.round(priceAmount * 100 * rate);
+}
+
+/**
  * The still-owed remainder of a committed (selected/booked) option once the
  * expenses linked to it are counted. Overpaying clamps to 0 — the overshoot
  * is real spend and shows up via the expense itself.

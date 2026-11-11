@@ -5,6 +5,7 @@ import { expenses, expenseShares, itineraryItems, journalEntries, optionIsActive
 import {
   categoryForOptionKind,
   EXPENSE_CATEGORIES,
+  optionPriceBaseCents,
   rollupsByCategory,
   unpaidCommittedCents,
   type CategoryCaps,
@@ -202,15 +203,38 @@ export async function budgetSummary(tripId: string, currency: string): Promise<B
       net.set(s.travelerId, (net.get(s.travelerId) ?? 0) - Math.round(Number(s.shareBase) * 100));
     }
   }
+  // Option prices are stored in the option's own currency but these rollups
+  // are base-currency. Fetch the shared Frankfurter rate once per foreign
+  // currency; a currency with no rate is excluded below — never fabricated.
+  const foreignCurrencies = [
+    ...new Set(
+      opts
+        .filter((o) => o.priceAmount && o.priceCurrency && o.priceCurrency !== currency)
+        .map((o) => o.priceCurrency!),
+    ),
+  ];
+  const optionRates = new Map<string, number>();
+  await Promise.all(
+    foreignCurrencies.map(async (cur) => {
+      try {
+        optionRates.set(cur, await fxRate(cur, currency));
+      } catch {
+        // No rate → that currency's options drop out of the base rollups.
+      }
+    }),
+  );
   let totalCommittedCents = 0;
   for (const o of opts) {
     if ((o.status !== 'selected' && o.status !== 'booked') || !o.priceAmount) continue;
     const cat = categoryForOptionKind(o.kind);
-    plannedByCategory[cat] = (plannedByCategory[cat] ?? 0) + Number(o.priceAmount);
-    // Option prices and expenses are both tracked in trip-currency units —
-    // the unpaid remainder is exact in the common same-currency case and an
-    // approximation under FX, matching plannedByCategory's convention.
-    const unpaid = unpaidCommittedCents(Math.round(Number(o.priceAmount) * 100), linkedCentsByOption.get(o.id) ?? 0);
+    const priceBaseCents = optionPriceBaseCents(
+      Number(o.priceAmount), o.priceCurrency, currency, optionRates,
+    );
+    if (priceBaseCents === null) continue;
+    plannedByCategory[cat] = (plannedByCategory[cat] ?? 0) + priceBaseCents / 100;
+    // The unpaid remainder compares base cents to base-currency linked
+    // expenses — exact once both sides are in the same unit.
+    const unpaid = unpaidCommittedCents(priceBaseCents, linkedCentsByOption.get(o.id) ?? 0);
     if (unpaid > 0) committedCentsByCategory[cat] = (committedCentsByCategory[cat] ?? 0) + unpaid;
     totalCommittedCents += unpaid;
   }
@@ -218,9 +242,14 @@ export async function budgetSummary(tripId: string, currency: string): Promise<B
     const cat = categoryForOptionKind(o.kind);
     if (o.status !== 'shortlisted' || !o.priceAmount || plannedByCategory[cat] !== undefined) continue;
     if (cat !== 'flights' && cat !== 'lodging') continue;
+    const priceBaseCents = optionPriceBaseCents(
+      Number(o.priceAmount), o.priceCurrency, currency, optionRates,
+    );
+    if (priceBaseCents === null) continue;
+    const amount = priceBaseCents / 100;
     const e = estimateByCategory[cat];
     estimateByCategory[cat] = {
-      amount: e ? Math.min(e.amount, Number(o.priceAmount)) : Number(o.priceAmount),
+      amount: e ? Math.min(e.amount, amount) : amount,
       count: (e?.count ?? 0) + 1,
     };
   }

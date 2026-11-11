@@ -22,6 +22,7 @@ import { assertTripRole, NotFoundError } from './access';
 import { recordEvent, touchTrip, type Tx } from './events';
 import { insertExpenseRows } from './expenses';
 import { tripDays } from './itinerary';
+import { latestPriceChecks } from './price-watch';
 
 export type OptionStatus = 'shortlisted' | 'selected' | 'booked' | 'rejected';
 
@@ -411,6 +412,13 @@ export type OptionPanelItem = {
   kind: string;
   /** Slimmed-down jsonb for the compare sheet (see compareDataFor). */
   data: unknown;
+  /** Latest Price Watch row (google_flights options); null when never checked. */
+  priceCheck?: {
+    checkedAt: string;
+    priceCents: number | null;
+    currency: string | null;
+    available: boolean;
+  } | null;
   votes: { score: number; voters: { name: string; value: number }[] };
   comments: { id: string; body: string; author: string }[];
 };
@@ -419,15 +427,30 @@ export type OptionPanelItem = {
 export async function optionPanel(tripId: string, kind: string): Promise<OptionPanelItem[]> {
   const rows = (await listOptions(tripId, kind)).map((r) => r.option);
   const ids = rows.map((o) => o.id);
-  const [votes, commentRows] = await Promise.all([listVotes(ids), listOptionComments(ids)]);
-  return rows.map((o) => ({
-    id: o.id, title: o.title, subtitle: o.subtitle, status: o.status,
-    price: o.priceAmount ? Number(o.priceAmount) : null, currency: o.priceCurrency,
-    bookingUrl: o.bookingUrl, bookingRef: o.bookingRef, source: o.source,
-    externalId: o.externalId, kind: o.kind, data: compareDataFor(o.kind, o.data),
-    votes: votes.get(o.id) ?? { score: 0, voters: [] },
-    comments: commentRows
-      .filter((c) => c.optionId === o.id)
-      .map((c) => ({ id: c.id, body: c.body, author: c.authorName })),
-  }));
+  const [votes, commentRows, checks] = await Promise.all([
+    listVotes(ids),
+    listOptionComments(ids),
+    latestPriceChecks(ids),
+  ]);
+  return rows.map((o) => {
+    const pc = checks.get(o.id);
+    return {
+      id: o.id, title: o.title, subtitle: o.subtitle, status: o.status,
+      price: o.priceAmount ? Number(o.priceAmount) : null, currency: o.priceCurrency,
+      bookingUrl: o.bookingUrl, bookingRef: o.bookingRef, source: o.source,
+      externalId: o.externalId, kind: o.kind, data: compareDataFor(o.kind, o.data),
+      priceCheck: pc
+        ? {
+            checkedAt: pc.checkedAt.toISOString(),
+            priceCents: pc.priceCents,
+            currency: pc.currency,
+            available: pc.available,
+          }
+        : null,
+      votes: votes.get(o.id) ?? { score: 0, voters: [] },
+      comments: commentRows
+        .filter((c) => c.optionId === o.id)
+        .map((c) => ({ id: c.id, body: c.body, author: c.authorName })),
+    };
+  });
 }

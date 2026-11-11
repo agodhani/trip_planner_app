@@ -3,6 +3,7 @@ import {
   categoryForOptionKind,
   EXPENSE_CATEGORIES,
   leftFromCap,
+  optionPriceBaseCents,
   overFromCap,
   perPersonCents,
   rollupsByCategory,
@@ -69,6 +70,32 @@ describe('leftFromCap / overFromCap', () => {
   it('is not over when spend lands exactly on the cap', () => {
     expect(overFromCap(30000, 30000, 0)).toBe(0);
     expect(leftFromCap(30000, 30000, 0)).toBe(0);
+  });
+});
+
+describe('optionPriceBaseCents', () => {
+  const rates = new Map([['EUR', 1.08]]);
+  it('is exact in the trip currency', () => {
+    expect(optionPriceBaseCents(412, 'USD', 'USD', rates)).toBe(41200);
+    expect(optionPriceBaseCents(412.99, 'USD', 'USD', rates)).toBe(41299);
+  });
+  it('treats a missing currency as the trip currency', () => {
+    expect(optionPriceBaseCents(100, null, 'USD', rates)).toBe(10000);
+    expect(optionPriceBaseCents(100, undefined, 'USD', rates)).toBe(10000);
+  });
+  it('converts foreign prices through the fetched rate', () => {
+    expect(optionPriceBaseCents(400, 'EUR', 'USD', rates)).toBe(43200);
+  });
+  it('excludes foreign prices without a rate — never mixes currencies', () => {
+    expect(optionPriceBaseCents(400, 'EUR', 'USD')).toBeNull();
+    expect(optionPriceBaseCents(400, 'EUR', 'USD', new Map())).toBeNull();
+    expect(optionPriceBaseCents(400, 'JPY', 'USD', rates)).toBeNull();
+  });
+  it('excludes zero, negative and non-finite prices', () => {
+    expect(optionPriceBaseCents(0, 'USD', 'USD', rates)).toBeNull();
+    expect(optionPriceBaseCents(-50, 'USD', 'USD', rates)).toBeNull();
+    expect(optionPriceBaseCents(Number.NaN, 'USD', 'USD', rates)).toBeNull();
+    expect(optionPriceBaseCents(null, 'USD', 'USD', rates)).toBeNull();
   });
 });
 

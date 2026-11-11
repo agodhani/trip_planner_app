@@ -76,6 +76,9 @@ export function eventTab(
     case 'transport':
       return 'transport';
     case 'flights':
+      // Price-watch results land where the check rows render: the shortlist.
+      if (sub === 'prices_checked' || sub === 'price_drop') return 'shortlist';
+      return 'flights';
     case 'dates':
       // Date-pair availability marks live on the pair grid in Flights.
       return 'flights';

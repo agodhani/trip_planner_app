@@ -24,6 +24,27 @@ export async function pickPlace(page: Page, field: string, query: string, label:
   await expect(page.getByRole('combobox', { name: field, exact: true })).toHaveCount(0);
 }
 
+/**
+ * Around-a-date trip matching the recorded google_flights fixtures:
+ * NYC → LIS around Dec 4 2026 with a return window (backs Dec 7).
+ */
+export async function createAroundDec4Trip(page: Page, returnWindow = true) {
+  await page.goto('/trips/new');
+  await pickPlace(page, 'From', 'new york', 'New York, US');
+  await pickPlace(page, 'To', 'lisbon', 'Lisbon, PT');
+  await page.getByRole('button', { name: 'Around a date' }).click();
+  await page.getByLabel('Around', { exact: true }).fill('2026-12-04');
+  if (returnWindow) await page.getByText('Return departs between').click();
+  await page.getByRole('button', { name: 'Create trip' }).click();
+  await expect(page).toHaveURL(/\/trips\/[0-9a-f-]{36}$/);
+}
+
+export function tripIdFromUrl(page: Page): string {
+  const m = /\/trips\/([0-9a-f-]{36})/.exec(page.url());
+  if (!m) throw new Error(`not on a trip page: ${page.url()}`);
+  return m[1];
+}
+
 export async function createTripWeekendsInNov2026(page: Page) {
   await page.goto('/trips/new');
   await pickPlace(page, 'From', 'new york', 'New York, US');

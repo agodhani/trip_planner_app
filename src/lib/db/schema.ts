@@ -375,6 +375,29 @@ export const tripOptions = pgTable(
  */
 export const optionIsActive = isNull(tripOptions.removedAt);
 
+/**
+ * Price Watch: one row per option per refresh. The option's own priceAmount
+ * stays the shortlist-time baseline — these rows are the observed history:
+ * priceCents null means the itinerary was still listed but carried no price,
+ * available false means it no longer appeared in the provider's results.
+ */
+export const optionPriceChecks = pgTable(
+  'option_price_checks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    optionId: uuid('option_id')
+      .notNull()
+      .references(() => tripOptions.id, { onDelete: 'cascade' }),
+    checkedAt: timestamp('checked_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    priceCents: integer('price_cents'),
+    currency: text('currency'),
+    available: boolean('available').notNull(),
+  },
+  (t) => [index('option_price_checks_option_idx').on(t.optionId, t.checkedAt)],
+);
+
 export const optionVotes = pgTable(
   'option_votes',
   {
