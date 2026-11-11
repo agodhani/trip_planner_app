@@ -1,7 +1,7 @@
 import 'server-only';
 import { and, count, eq, sum } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { expenses, itineraryItems, transportLegs, tripOptions } from '@/lib/db/schema';
+import { expenses, itineraryItems, optionIsActive, transportLegs, tripOptions } from '@/lib/db/schema';
 import { summarizeProgress, type TripProgress } from '@/lib/domain/progress';
 import { latestSearch } from './flights';
 import { tripDays } from './itinerary';
@@ -11,7 +11,7 @@ import type { TripRow } from './trips';
 export async function tripProgress(trip: TripRow): Promise<TripProgress> {
   const [opts, items, legs, exp, search] = await Promise.all([
     db.select({ kind: tripOptions.kind, status: tripOptions.status, title: tripOptions.title })
-      .from(tripOptions).where(eq(tripOptions.tripId, trip.id)),
+      .from(tripOptions).where(and(eq(tripOptions.tripId, trip.id), optionIsActive)),
     db.select({ day: itineraryItems.day, system: itineraryItems.system, unplanned: itineraryItems.unplanned })
       .from(itineraryItems).where(eq(itineraryItems.tripId, trip.id)),
     db.select({ n: count() }).from(transportLegs)

@@ -5,7 +5,15 @@ import { z } from 'zod';
 import { formFields } from '@/lib/form-data';
 import { requireTripRole } from '@/lib/auth/guards';
 import { NotFoundError } from '@/lib/services/access';
-import { addOption, deleteOption, setOptionStatus, vote, type BookingPayment } from '@/lib/services/options';
+import {
+  addOption,
+  deleteOption,
+  purgeOption,
+  restoreOption,
+  setOptionStatus,
+  vote,
+  type BookingPayment,
+} from '@/lib/services/options';
 import { addComment } from '@/lib/services/comments';
 import type { ActionState } from './people';
 
@@ -103,6 +111,34 @@ export async function deleteOptionAction(formData: FormData): Promise<void> {
   const { user } = await requireTripRole(tripId, 'editor');
   try {
     await deleteOption(user, tripId, optionId);
+  } catch (err) {
+    if (err instanceof NotFoundError) return;
+    throw err;
+  }
+  revalidate(tripId, section);
+}
+
+export async function restoreOptionAction(formData: FormData): Promise<void> {
+  const tripId = z.string().uuid().parse(formData.get('tripId'));
+  const section = sectionEnum.parse(formData.get('section'));
+  const optionId = z.string().uuid().parse(formData.get('optionId'));
+  const { user } = await requireTripRole(tripId, 'editor');
+  try {
+    await restoreOption(user, tripId, optionId);
+  } catch (err) {
+    if (err instanceof NotFoundError) return;
+    throw err;
+  }
+  revalidate(tripId, section);
+}
+
+export async function purgeOptionAction(formData: FormData): Promise<void> {
+  const tripId = z.string().uuid().parse(formData.get('tripId'));
+  const section = sectionEnum.parse(formData.get('section'));
+  const optionId = z.string().uuid().parse(formData.get('optionId'));
+  const { user } = await requireTripRole(tripId, 'editor');
+  try {
+    await purgeOption(user, tripId, optionId);
   } catch (err) {
     if (err instanceof NotFoundError) return;
     throw err;

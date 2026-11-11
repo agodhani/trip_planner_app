@@ -1,7 +1,7 @@
 import 'server-only';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { expenses, expenseShares, itineraryItems, journalEntries, travelers, tripOptions, trips, users } from '@/lib/db/schema';
+import { expenses, expenseShares, itineraryItems, journalEntries, optionIsActive, travelers, tripOptions, trips, users } from '@/lib/db/schema';
 import {
   categoryForOptionKind,
   EXPENSE_CATEGORIES,
@@ -175,7 +175,7 @@ export async function budgetSummary(tripId: string, currency: string): Promise<B
   const [tripRow, opts, exps, tvl] = await Promise.all([
     db.select({ budgetTotal: trips.budgetTotal, budgetByCategory: trips.budgetByCategory })
       .from(trips).where(eq(trips.id, tripId)).limit(1),
-    db.select().from(tripOptions).where(eq(tripOptions.tripId, tripId)),
+    db.select().from(tripOptions).where(and(eq(tripOptions.tripId, tripId), optionIsActive)),
     listExpenses(tripId),
     listTravelers(tripId),
   ]);

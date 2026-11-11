@@ -1,7 +1,7 @@
 import 'server-only';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { itineraryItems, transportLegs, tripOptions } from '@/lib/db/schema';
+import { itineraryItems, optionIsActive, transportLegs, tripOptions } from '@/lib/db/schema';
 import { todayISO } from '@/lib/clock';
 import { candidatePairs } from '@/lib/domain/dates/strategy';
 import { arrangeableDays, autoAssign, dayList, orderDay, to24h } from '@/lib/domain/itinerary';
@@ -103,7 +103,7 @@ function stayAnchors(trip: TripRow, opt: typeof tripOptions.$inferSelect): Ancho
 
 export async function anchorSpecs(trip: TripRow): Promise<AnchorInsert[]> {
   const rows = await db.select().from(tripOptions)
-    .where(eq(tripOptions.tripId, trip.id));
+    .where(and(eq(tripOptions.tripId, trip.id), optionIsActive));
   const chosen = rows.filter((o) => o.status === 'selected' || o.status === 'booked');
   const specs: AnchorInsert[] = [];
   for (const o of chosen) {
@@ -347,7 +347,7 @@ export async function autoArrange(user: { id: string; name: string }, tripId: st
   const optIds = free.map((i) => i.optionId).filter((x): x is string => !!x);
   if (optIds.length) {
     const opts = await db.select().from(tripOptions)
-      .where(and(eq(tripOptions.tripId, tripId), inArray(tripOptions.id, optIds)));
+      .where(and(eq(tripOptions.tripId, tripId), inArray(tripOptions.id, optIds), optionIsActive));
     for (const o of opts) hoursByOption.set(o.id, (o.data as { hours?: unknown }).hours);
   }
   const anchorByDay = new Map<string, { lat: number; lon: number } | null>();

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { RemovedOptions, type RemovedOptionItem } from '@/components/removed-options';
 import { ShortlistedOptions, ui, type ShortlistedOption } from '@/components/shortlisted-options';
 
 const { card } = ui;
@@ -12,9 +13,11 @@ const KIND_LABEL: Record<Kind, string> = {
 };
 
 /** Trip-wide shortlist: all shortlisted options grouped by kind, filterable. */
-export function ShortlistClient({ tripId, canEdit, groups }: {
+export function ShortlistClient({ tripId, canEdit, groups, removed }: {
   tripId: string; canEdit: boolean;
   groups: { kind: Kind; items: ShortlistedOption[] }[];
+  /** Bin contents — fetched only for editors; always empty for viewers. */
+  removed: RemovedOptionItem[];
 }) {
   const [kind, setKind] = useState<'all' | Kind>('all');
   const total = groups.reduce((n, g) => n + g.items.length, 0);
@@ -73,6 +76,7 @@ export function ShortlistClient({ tripId, canEdit, groups }: {
           <p className="text-sm text-neutral-500">No {KIND_LABEL[kind].toLowerCase()} shortlisted.</p>
         </section>
       )}
+      {canEdit && <RemovedOptions tripId={tripId} items={removed} />}
     </div>
   );
 }

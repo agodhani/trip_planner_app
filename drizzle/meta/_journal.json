@@ -43,6 +43,13 @@
       "when": 1794370846206,
       "tag": "0005_rare_human_robot",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794372223404,
+      "tag": "0006_daily_spectrum",
+      "breakpoints": true
     }
   ]
 }

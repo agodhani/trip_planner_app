@@ -95,8 +95,14 @@ test('flights: shortlisting the same flight from two tabs never crashes or dupli
 
   await outboundRows(page).first().getByRole('button', { name: 'Shortlist', exact: true }).click();
   await expect(outboundRows(page).first().getByText('Shortlisted')).toBeVisible({ timeout: 15_000 });
-  await outboundRows(tab2).first().getByRole('button', { name: 'Shortlist', exact: true }).click();
-  await expect(outboundRows(tab2).first().getByText('Shortlisted')).toBeVisible({ timeout: 15_000 });
+  // TripPulse may refresh tab2 before its click lands, flipping the row to
+  // 'Shortlisted' — either path must leave exactly one option row.
+  const row2 = outboundRows(tab2).first();
+  const shortlistBtn2 = row2.getByRole('button', { name: 'Shortlist', exact: true });
+  if (await shortlistBtn2.isVisible().catch(() => false)) {
+    await shortlistBtn2.click();
+  }
+  await expect(row2.getByText('Shortlisted')).toBeVisible({ timeout: 15_000 });
 
   expect(errors).toEqual([]);
   await expect(tab2.getByText('Could not shortlist')).toHaveCount(0);

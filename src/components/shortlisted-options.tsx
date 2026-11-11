@@ -1,14 +1,15 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { ExternalLink, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react';
 import {
-  deleteOptionAction, optionCommentAction, optionStatusAction, voteAction,
+  deleteOptionAction, optionCommentAction, optionStatusAction, restoreOptionAction, voteAction,
 } from '@/lib/actions/options';
 import type { ActionState } from '@/lib/actions/people';
 import { SubmitButton } from '@/components/submit-button';
 import { CompareToggle, CompareTray } from '@/components/compare-tray';
 import { MarkBookedControl } from '@/components/mark-booked';
+import { useToast } from '@/components/toaster';
 import { money } from '@/lib/ui-format';
 
 export type ShortlistedOption = {
@@ -42,6 +43,51 @@ export function HiddenIds({ tripId, section, optionId }: { tripId: string; secti
       <input type="hidden" name="section" value={section} />
       <input type="hidden" name="optionId" value={optionId} />
     </>
+  );
+}
+
+function optionIdsForm(tripId: string, section: string, optionId: string): FormData {
+  const fd = new FormData();
+  fd.set('tripId', tripId);
+  fd.set('section', section);
+  fd.set('optionId', optionId);
+  return fd;
+}
+
+/**
+ * Bin instead of delete: the card leaves the list, a toast offers Undo, and
+ * the row lands in "Recently removed" on the Shortlist tab.
+ */
+function RemoveOptionButton({ tripId, section, optionId, title }: {
+  tripId: string; section: string; optionId: string; title: string;
+}) {
+  const toast = useToast();
+  const [pending, setPending] = useState(false);
+  return (
+    <button
+      type="button"
+      className={btn2}
+      disabled={pending}
+      title="Remove from shortlist (keeps votes and comments — undoable)"
+      onClick={async () => {
+        setPending(true);
+        try {
+          await deleteOptionAction(optionIdsForm(tripId, section, optionId));
+          toast.push(`Removed ${title}`, {
+            actionLabel: 'Undo',
+            onAction: () => {
+              void restoreOptionAction(optionIdsForm(tripId, section, optionId));
+            },
+          });
+        } catch {
+          toast.push(`Could not remove ${title} — please try again.`);
+        } finally {
+          setPending(false);
+        }
+      }}
+    >
+      <Trash2 aria-hidden className="h-3.5 w-3.5" />Remove
+    </button>
   );
 }
 
@@ -116,12 +162,7 @@ export function ShortlistedOptions({
                     </a>
                   )}
                   {canEdit && (
-                    <form action={deleteOptionAction}>
-                      <HiddenIds tripId={tripId} section={section} optionId={o.id} />
-                      <SubmitButton className={btn2} title="Remove from shortlist">
-                        <Trash2 aria-hidden className="h-3.5 w-3.5" />Remove
-                      </SubmitButton>
-                    </form>
+                    <RemoveOptionButton tripId={tripId} section={section} optionId={o.id} title={o.title} />
                   )}
                 </div>
               </div>

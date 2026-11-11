@@ -1,7 +1,7 @@
 import 'server-only';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { activityEvents, comments, tripOptions, users } from '@/lib/db/schema';
+import { activityEvents, comments, optionIsActive, tripOptions, users } from '@/lib/db/schema';
 import { assertTripRole, NotFoundError } from './access';
 import { recordEvent } from './events';
 
@@ -41,7 +41,7 @@ export async function addComment(
       const opt = await tx
         .select({ id: tripOptions.id })
         .from(tripOptions)
-        .where(and(eq(tripOptions.id, optionId), eq(tripOptions.tripId, tripId)))
+        .where(and(eq(tripOptions.id, optionId), eq(tripOptions.tripId, tripId), optionIsActive))
         .limit(1);
       if (!opt[0]) throw new NotFoundError('Option not found');
     }

@@ -1,7 +1,16 @@
 import 'server-only';
-import { and, asc, desc, eq, inArray, ne } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, ne } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { comments, optionVotes, travelers, tripOptions, trips, users } from '@/lib/db/schema';
+import {
+  comments,
+  optionIsActive,
+  optionVotes,
+  travelers,
+  tripOptions,
+  trips,
+  users,
+} from '@/lib/db/schema';
+import { readdOutcome } from '@/lib/domain/option-bin';
 import { categoryForOptionKind } from '@/lib/domain/budget';
 import { compareDataFor } from '@/lib/domain/compare';
 import { planSplit, toBaseCents, toCents, type SplitRow } from '@/lib/domain/money';
@@ -21,9 +30,50 @@ export async function listOptions(tripId: string, kind?: string) {
     .select({ option: tripOptions, author: users.name })
     .from(tripOptions)
     .innerJoin(users, eq(tripOptions.createdBy, users.id))
-    .where(kind ? and(eq(tripOptions.tripId, tripId), eq(tripOptions.kind, kind as never)) : eq(tripOptions.tripId, tripId))
+    .where(
+      kind
+        ? and(eq(tripOptions.tripId, tripId), eq(tripOptions.kind, kind as never), optionIsActive)
+        : and(eq(tripOptions.tripId, tripId), optionIsActive),
+    )
     .orderBy(desc(tripOptions.createdAt));
   return rows;
+}
+
+type OptionRow = typeof tripOptions.$inferSelect;
+
+/**
+ * Un-bin a row inside a transaction. One-pick invariant: if the group moved
+ * on while this sat in the bin — another active option of the same kind is
+ * already selected/booked — a binned flight/stay comes back 'shortlisted'
+ * rather than as a second pick.
+ */
+async function unremoveOption(tx: Tx, opt: OptionRow): Promise<OptionRow> {
+  let status = opt.status;
+  if (
+    (opt.kind === 'flight' || opt.kind === 'lodging') &&
+    (opt.status === 'selected' || opt.status === 'booked')
+  ) {
+    const clash = await tx
+      .select({ id: tripOptions.id })
+      .from(tripOptions)
+      .where(
+        and(
+          eq(tripOptions.tripId, opt.tripId),
+          eq(tripOptions.kind, opt.kind),
+          ne(tripOptions.id, opt.id),
+          inArray(tripOptions.status, ['selected', 'booked']),
+          optionIsActive,
+        ),
+      )
+      .limit(1);
+    if (clash[0]) status = 'shortlisted';
+  }
+  const [restored] = await tx
+    .update(tripOptions)
+    .set({ removedAt: null, removedBy: null, status, updatedAt: new Date() })
+    .where(eq(tripOptions.id, opt.id))
+    .returning();
+  return restored;
 }
 
 export async function addOption(
@@ -59,10 +109,22 @@ export async function addOption(
       createdBy: user.id,
     }).onConflictDoNothing().returning();
     if (!row) {
+      // Deliberately unfiltered: a conflict can mean "still shortlisted" or
+      // "sitting in the bin" — re-shortlisting a binned result restores it,
+      // votes and comments intact.
       const [existing] = await tx.select().from(tripOptions).where(and(
         eq(tripOptions.tripId, tripId), eq(tripOptions.kind, input.kind),
         eq(tripOptions.source, input.source), eq(tripOptions.externalId, input.externalId ?? ''),
       )).limit(1);
+      if (existing && readdOutcome(existing) === 'restore') {
+        const restored = await unremoveOption(tx, existing);
+        await recordEvent(tx, {
+          tripId, userId: user.id, verb: 'option.restored',
+          summary: `${user.name} restored ${restored.title}`,
+          entityType: 'option', entityId: restored.id,
+        });
+        return restored;
+      }
       return existing;
     }
     await recordEvent(tx, {
@@ -151,7 +213,7 @@ export async function setOptionStatus(
   if (status === 'booked' && booking?.logExpense) {
     const [opt, tripRow] = await Promise.all([
       db.select().from(tripOptions)
-        .where(and(eq(tripOptions.id, optionId), eq(tripOptions.tripId, tripId))).limit(1),
+        .where(and(eq(tripOptions.id, optionId), eq(tripOptions.tripId, tripId), optionIsActive)).limit(1),
       db.select({ currency: trips.currency }).from(trips).where(eq(trips.id, tripId)).limit(1),
     ]);
     if (!opt[0]) throw new NotFoundError('Option not found');
@@ -163,12 +225,13 @@ export async function setOptionStatus(
 
   await db.transaction(async (tx) => {
     const opt = await tx.select().from(tripOptions)
-      .where(and(eq(tripOptions.id, optionId), eq(tripOptions.tripId, tripId))).limit(1);
+      .where(and(eq(tripOptions.id, optionId), eq(tripOptions.tripId, tripId), optionIsActive)).limit(1);
     if (!opt[0]) throw new NotFoundError('Option not found');
     // One flight and one stay per trip; activities/transport can stack.
+    // Binned rows are frozen — they demote on restore, not here.
     if (status === 'selected' && (opt[0].kind === 'flight' || opt[0].kind === 'lodging')) {
       await tx.update(tripOptions).set({ status: 'shortlisted' })
-        .where(and(eq(tripOptions.tripId, tripId), eq(tripOptions.kind, opt[0].kind), eq(tripOptions.status, 'selected'), ne(tripOptions.id, optionId)));
+        .where(and(eq(tripOptions.tripId, tripId), eq(tripOptions.kind, opt[0].kind), eq(tripOptions.status, 'selected'), ne(tripOptions.id, optionId), optionIsActive));
     }
     // Selected flight anchors the trip dates. A one-way option (no return
     // leg) keeps the established window end — explicit dates win, otherwise
@@ -219,6 +282,11 @@ export async function setOptionStatus(
   });
 }
 
+/**
+ * Move an option to the bin (soft delete). Votes/comments keep their optionId
+ * and come back on restore; itinerary items and expenses keep pointing at the
+ * row, which is filtered out of every active read by optionIsActive.
+ */
 export async function deleteOption(
   user: { id: string; name: string }, tripId: string, optionId: string,
 ) {
@@ -227,12 +295,70 @@ export async function deleteOption(
     const opt = await tx.select().from(tripOptions)
       .where(and(eq(tripOptions.id, optionId), eq(tripOptions.tripId, tripId))).limit(1);
     if (!opt[0]) throw new NotFoundError('Option not found');
-    await tx.delete(tripOptions).where(eq(tripOptions.id, optionId));
+    if (opt[0].removedAt) return; // already in the bin — remove is idempotent
+    await tx.update(tripOptions)
+      .set({ removedAt: new Date(), removedBy: user.id, updatedAt: new Date() })
+      .where(eq(tripOptions.id, optionId));
     await recordEvent(tx, {
       tripId, userId: user.id, verb: 'option.removed',
       summary: `${user.name} removed ${opt[0].title}`, entityType: 'option', entityId: optionId,
     });
   });
+}
+
+/** Undo a removal: the option comes back with its votes and comments. */
+export async function restoreOption(
+  user: { id: string; name: string }, tripId: string, optionId: string,
+) {
+  await assertTripRole(tripId, user.id, 'editor');
+  await db.transaction(async (tx) => {
+    const opt = await tx.select().from(tripOptions)
+      .where(and(eq(tripOptions.id, optionId), eq(tripOptions.tripId, tripId))).limit(1);
+    if (!opt[0]) throw new NotFoundError('Option not found');
+    if (!opt[0].removedAt) return; // not in the bin — nothing to restore
+    const restored = await unremoveOption(tx, opt[0]);
+    await recordEvent(tx, {
+      tripId, userId: user.id, verb: 'option.restored',
+      summary: `${user.name} restored ${restored.title}`, entityType: 'option', entityId: optionId,
+    });
+  });
+}
+
+/**
+ * Delete forever — the old hard delete. Only bin members may be purged, and
+ * it stays a tx.delete: votes/comments cascade, itinerary/expense links go
+ * null but keep their denormalized titles.
+ */
+export async function purgeOption(
+  user: { id: string; name: string }, tripId: string, optionId: string,
+) {
+  await assertTripRole(tripId, user.id, 'editor');
+  await db.transaction(async (tx) => {
+    const opt = await tx.select().from(tripOptions)
+      .where(and(eq(tripOptions.id, optionId), eq(tripOptions.tripId, tripId))).limit(1);
+    if (!opt[0]) throw new NotFoundError('Option not found');
+    if (!opt[0].removedAt) throw new Error('Only a removed option can be deleted forever');
+    await tx.delete(tripOptions).where(eq(tripOptions.id, optionId));
+    await recordEvent(tx, {
+      tripId, userId: user.id, verb: 'option.purged',
+      summary: `${user.name} permanently deleted ${opt[0].title}`, entityType: 'option', entityId: optionId,
+    });
+  });
+}
+
+export type RemovedOptionRow = {
+  option: OptionRow;
+  remover: string | null;
+};
+
+/** The bin: removed options newest first, with who removed them. */
+export async function listRemovedOptions(tripId: string): Promise<RemovedOptionRow[]> {
+  return db
+    .select({ option: tripOptions, remover: users.name })
+    .from(tripOptions)
+    .leftJoin(users, eq(tripOptions.removedBy, users.id))
+    .where(and(eq(tripOptions.tripId, tripId), isNotNull(tripOptions.removedAt)))
+    .orderBy(desc(tripOptions.removedAt));
 }
 
 export async function vote(
@@ -243,7 +369,7 @@ export async function vote(
     const opt = await tx
       .select({ id: tripOptions.id })
       .from(tripOptions)
-      .where(and(eq(tripOptions.id, optionId), eq(tripOptions.tripId, tripId)))
+      .where(and(eq(tripOptions.id, optionId), eq(tripOptions.tripId, tripId), optionIsActive))
       .limit(1);
     if (!opt[0]) throw new NotFoundError('Option not found');
     if (value === 0) {

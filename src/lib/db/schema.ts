@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { isNull, sql } from 'drizzle-orm';
 import type { ExpenseCategory } from '@/lib/domain/budget';
 import type { DateStrategy, TimePrefs } from '@/lib/domain/dates/strategy';
 import type { PlaceRef } from '@/lib/providers/types';
@@ -351,6 +351,12 @@ export const tripOptions = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
+    // Soft delete ("the bin"): set = removed, recoverable via restoreOption;
+    // votes/comments survive because nothing cascades until purgeOption.
+    removedAt: timestamp('removed_at', { withTimezone: true }),
+    removedBy: uuid('removed_by').references(() => users.id, {
+      onDelete: 'set null',
+    }),
   },
   (t) => [
     uniqueIndex('trip_options_external_uniq')
@@ -358,6 +364,16 @@ export const tripOptions = pgTable(
       .where(sql`${t.externalId} is not null`),
   ],
 );
+
+/**
+ * Soft-delete predicate: a binned option (removedAt set) is invisible to
+ * every listing, tally, anchor and link lookup. Apply at every trip_options
+ * read — exceptions are the bin itself (listRemovedOptions), mutation guards
+ * that must find binned rows (delete/restore/purge, addOption's conflict
+ * path), and the pulse feed's optionKind join (an 'option.removed' event
+ * still needs the removed row's kind to map to the right tab).
+ */
+export const optionIsActive = isNull(tripOptions.removedAt);
 
 export const optionVotes = pgTable(
   'option_votes',

@@ -38,6 +38,8 @@ type Item = {
   notes: string | null; plannedCost: number | null;
   lat: number | null; lon: number | null; optionId: string | null;
   durationMin: number | null; hoursNote: string | null;
+  /** The linked shortlist option sits in the bin — the title is a snapshot. */
+  optionRemoved: boolean;
 };
 type Leg = { id: string; fromItemId: string; toItemId: string; mode: string; durationMin: number | null; summary: string | null; deepLink: string | null; chosen: boolean };
 type PoolOption = { id: string; title: string; lat: number | null; lon: number | null; closedDays: string[]; closedNote: string | null };
@@ -81,6 +83,11 @@ function ItemCard({ it, canEdit, tripId, days, currency, dragHandle, onDelete }:
             <p className="font-medium">
               {it.title}
               {it.locked && !it.system && <span className="ml-1.5 text-xs font-normal text-neutral-400">locked</span>}
+              {it.optionRemoved && (
+                <span className="ml-1.5 rounded bg-neutral-100 px-1.5 text-xs font-normal text-neutral-500" title="The shortlist option this came from was removed">
+                  removed
+                </span>
+              )}
             </p>
             <p className="text-xs text-neutral-500">
               {meta || (it.system ? 'Added from your selected flight/stay' : canEdit ? 'No time set' : '')}

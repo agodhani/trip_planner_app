@@ -2,7 +2,7 @@ import 'server-only';
 import { createHash, randomBytes } from 'node:crypto';
 import { and, asc, eq, gt, isNull, or } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { shareLinks, travelers, tripOptions, trips } from '@/lib/db/schema';
+import { optionIsActive, shareLinks, travelers, tripOptions, trips } from '@/lib/db/schema';
 import { describeStrategy } from '@/lib/domain/dates/strategy';
 import { buildShareView, linkIsActive, type ShareView } from '@/lib/domain/share-view';
 import { env } from '@/lib/env';
@@ -162,7 +162,7 @@ export async function resolveShareToken(token: string): Promise<ShareView | null
         bookingUrl: tripOptions.bookingUrl,
       })
       .from(tripOptions)
-      .where(eq(tripOptions.tripId, trip.id)),
+      .where(and(eq(tripOptions.tripId, trip.id), optionIsActive)),
     listItems(trip.id),
   ]);
 

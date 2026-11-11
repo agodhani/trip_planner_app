@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { requireTripRole } from '@/lib/auth/guards';
 import { listItems, listLegs, tripDays } from '@/lib/services/itinerary';
-import { listOptions } from '@/lib/services/options';
+import { listOptions, listRemovedOptions } from '@/lib/services/options';
 import { closedWeekdays, hoursWarning, WEEKDAY_SHORT } from '@/lib/domain/opening-hours';
 import { getTrip } from '@/lib/services/trips';
 import { ItineraryClient } from '@/components/itinerary-client';
@@ -11,9 +11,12 @@ export default async function ItineraryPage({ params }: { params: Promise<{ trip
   const { role } = await requireTripRole(tripId, 'viewer');
   const trip = await getTrip(tripId);
   if (!trip) notFound();
-  const [items, legs, pool] = await Promise.all([
-    listItems(tripId), listLegs(tripId), listOptions(tripId, 'activity'),
+  const [items, legs, pool, removed] = await Promise.all([
+    listItems(tripId), listLegs(tripId), listOptions(tripId, 'activity'), listRemovedOptions(tripId),
   ]);
+  // Items linked to a binned option keep their denormalized title — flag them
+  // so the card can say the shortlist entry is gone.
+  const removedIds = new Set(removed.map((r) => r.option.id));
   const range = tripDays(trip);
   const days = range?.days ?? [];
   const hoursOf = (o: { data: unknown }) => (o.data as { hours?: unknown }).hours;
@@ -46,6 +49,7 @@ export default async function ItineraryPage({ params }: { params: Promise<{ trip
         lat: (i.location as { lat?: number } | null)?.lat ?? null,
         lon: (i.location as { lon?: number } | null)?.lon ?? null,
         optionId: i.optionId, durationMin: i.durationMin ?? null,
+        optionRemoved: i.optionId ? removedIds.has(i.optionId) : false,
         hoursNote: i.day && i.optionId
           ? hoursWarning(hoursByOption.get(i.optionId), i.day, i.startTime?.slice(0, 5), i.endTime?.slice(0, 5))?.message ?? null
           : null,

@@ -77,6 +77,8 @@ export async function tripPulse(
     })
     .from(activityEvents)
     .leftJoin(users, eq(activityEvents.userId, users.id))
+    // Deliberately unfiltered by optionIsActive: an 'option.removed' event
+    // still needs the binned row's kind to land on the right tab.
     .leftJoin(
       tripOptions,
       and(
