@@ -2,12 +2,13 @@ import 'server-only';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { itineraryItems, transportLegs } from '@/lib/db/schema';
+import { missingLegPairs } from '@/lib/domain/day-timing';
 import { orderDay } from '@/lib/domain/itinerary';
 import { routeEstimate } from '@/lib/providers/routing';
 import { planTransit } from '@/lib/providers/transitous';
 import { ProviderError } from '@/lib/providers/types';
 import { assertTripRole, NotFoundError } from './access';
-import { recordEvent } from './events';
+import { recordEvent, type Tx } from './events';
 import { listItems, tripDays } from './itinerary';
 import { getTrip } from './trips';
 
@@ -41,6 +42,63 @@ export async function legPairs(tripId: string) {
   return pairs;
 }
 
+type PairItems = Awaited<ReturnType<typeof legPairs>>[number];
+
+/** Compute walk/drive/transit legs for one located pair and upsert them. */
+async function computePairLegs(
+  user: { id: string }, tripId: string, { from, to }: PairItems,
+): Promise<{ computed: number; failed: number }> {
+  const a = loc(from)!, b = loc(to)!;
+  const dayTime = `${from.day}T12:00:00Z`;
+  let computed = 0, failed = 0;
+  for (const mode of ['walk', 'drive', 'transit'] as const) {
+    try {
+      let leg: { durationMin: number; distanceM: number | null; summary: string; source: 'osrm' | 'fossgis' | 'transitous'; details?: object };
+      if (mode === 'transit') {
+        const p = await planTransit(a, b, dayTime, { tripId, userId: user.id });
+        if (!p) continue;
+        leg = { durationMin: p.durationMin, distanceM: null, summary: `${p.summary}${p.transfers ? ` · ${p.transfers} transfer${p.transfers === 1 ? '' : 's'}` : ''}`, source: 'transitous', details: { legs: p.legs } };
+      } else {
+        const r = await routeEstimate(mode === 'walk' ? 'walk' : 'drive', a, b, { tripId, userId: user.id });
+        if (!r) continue;
+        leg = { durationMin: r.durationMin, distanceM: r.distanceM, summary: `${r.durationMin} min · ${(r.distanceM / 1000).toFixed(1)} km`, source: mode === 'walk' ? 'fossgis' : 'osrm' };
+      }
+      const deepLink = mapsDirLink(a, b, mode === 'walk' ? 'walking' : mode === 'drive' ? 'driving' : 'transit');
+      await db.insert(transportLegs).values({
+        tripId, fromItemId: from.id, toItemId: to.id, mode: mode === 'drive' ? 'drive' : mode,
+        durationMin: leg.durationMin, distanceM: leg.distanceM, summary: leg.summary,
+        source: leg.source, details: leg.details ?? null, deepLink,
+        chosen: false, computedAt: new Date(),
+      }).onConflictDoUpdate({
+        target: [transportLegs.fromItemId, transportLegs.toItemId, transportLegs.mode],
+        set: { durationMin: leg.durationMin, distanceM: leg.distanceM, summary: leg.summary, source: leg.source, details: leg.details ?? null, deepLink, computedAt: new Date() },
+      });
+      computed++;
+    } catch (err) {
+      failed++;
+      if (!(err instanceof ProviderError)) throw err;
+    }
+  }
+  return { computed, failed };
+}
+
+/** Auto-choose a sensible default per pair: walk ≤ 20 min, else transit, else drive. */
+async function autoChooseLegs(tx: Tx, tripId: string) {
+  const legs = await tx.select().from(transportLegs).where(eq(transportLegs.tripId, tripId));
+  type LegRow = typeof transportLegs.$inferSelect;
+  const pairsSeen = new Map<string, LegRow[]>();
+  for (const l of legs) {
+    const k = `${l.fromItemId}|${l.toItemId}`;
+    pairsSeen.set(k, [...(pairsSeen.get(k) ?? []), l]);
+  }
+  for (const arr of pairsSeen.values()) {
+    if (arr.some((l) => l.chosen)) continue;
+    const walk = arr.find((l) => l.mode === 'walk' && (l.durationMin ?? 999) <= 20);
+    const pick = walk ?? arr.find((l) => l.mode === 'transit') ?? arr.find((l) => l.mode === 'drive') ?? arr[0];
+    await tx.update(transportLegs).set({ chosen: true }).where(eq(transportLegs.id, pick.id));
+  }
+}
+
 /** Compute/refresh legs for all located consecutive pairs. */
 export async function computeLegs(user: { id: string; name: string }, tripId: string) {
   await assertTripRole(tripId, user.id, 'editor');
@@ -48,56 +106,55 @@ export async function computeLegs(user: { id: string; name: string }, tripId: st
   if (!trip) throw new NotFoundError();
   const pairs = await legPairs(tripId);
   let computed = 0, failed = 0;
-  for (const { from, to } of pairs) {
-    const a = loc(from)!, b = loc(to)!;
-    const dayTime = `${from.day}T12:00:00Z`;
-    for (const mode of ['walk', 'drive', 'transit'] as const) {
-      try {
-        let leg: { durationMin: number; distanceM: number | null; summary: string; source: 'osrm' | 'fossgis' | 'transitous'; details?: object };
-        if (mode === 'transit') {
-          const p = await planTransit(a, b, dayTime, { tripId, userId: user.id });
-          if (!p) continue;
-          leg = { durationMin: p.durationMin, distanceM: null, summary: `${p.summary}${p.transfers ? ` · ${p.transfers} transfer${p.transfers === 1 ? '' : 's'}` : ''}`, source: 'transitous', details: { legs: p.legs } };
-        } else {
-          const r = await routeEstimate(mode === 'walk' ? 'walk' : 'drive', a, b, { tripId, userId: user.id });
-          if (!r) continue;
-          leg = { durationMin: r.durationMin, distanceM: r.distanceM, summary: `${r.durationMin} min · ${(r.distanceM / 1000).toFixed(1)} km`, source: mode === 'walk' ? 'fossgis' : 'osrm' };
-        }
-        const deepLink = mapsDirLink(a, b, mode === 'walk' ? 'walking' : mode === 'drive' ? 'driving' : 'transit');
-        await db.insert(transportLegs).values({
-          tripId, fromItemId: from.id, toItemId: to.id, mode: mode === 'drive' ? 'drive' : mode,
-          durationMin: leg.durationMin, distanceM: leg.distanceM, summary: leg.summary,
-          source: leg.source, details: leg.details ?? null, deepLink,
-          chosen: false, computedAt: new Date(),
-        }).onConflictDoUpdate({
-          target: [transportLegs.fromItemId, transportLegs.toItemId, transportLegs.mode],
-          set: { durationMin: leg.durationMin, distanceM: leg.distanceM, summary: leg.summary, source: leg.source, details: leg.details ?? null, deepLink, computedAt: new Date() },
-        });
-        computed++;
-      } catch (err) {
-        failed++;
-        if (!(err instanceof ProviderError)) throw err;
-      }
-    }
-  }
-  // Auto-choose a sensible default per pair: walk ≤ 20 min, else transit, else drive.
-  const legs = await db.select().from(transportLegs).where(eq(transportLegs.tripId, tripId));
-  const pairsSeen = new Map<string, LegRow[]>();
-  type LegRow = typeof transportLegs.$inferSelect;
-  for (const l of legs) {
-    const k = `${l.fromItemId}|${l.toItemId}`;
-    pairsSeen.set(k, [...(pairsSeen.get(k) ?? []), l]);
+  for (const pair of pairs) {
+    const r = await computePairLegs(user, tripId, pair);
+    computed += r.computed;
+    failed += r.failed;
   }
   await db.transaction(async (tx) => {
-    for (const arr of pairsSeen.values()) {
-      if (arr.some((l) => l.chosen)) continue;
-      const walk = arr.find((l) => l.mode === 'walk' && (l.durationMin ?? 999) <= 20);
-      const pick = walk ?? arr.find((l) => l.mode === 'transit') ?? arr.find((l) => l.mode === 'drive') ?? arr[0];
-      await tx.update(transportLegs).set({ chosen: true }).where(eq(transportLegs.id, pick.id));
-    }
+    await autoChooseLegs(tx, tripId);
     await recordEvent(tx, {
       tripId, userId: user.id, verb: 'transport.legs_computed',
       summary: `${user.name} computed ${computed} route legs${failed ? ` (${failed} unavailable)` : ''}`,
+      entityType: 'trip', entityId: tripId,
+    });
+  });
+  return { computed, failed };
+}
+
+const SYNC_PAIR_CAP = 8;
+
+/**
+ * Board fire-and-forget sync: compute legs only for consecutive located pairs
+ * that have none stored (capped per call). Pairs where either item lacks
+ * coordinates are skipped silently; provider failures on a located pair are
+ * counted but leave the hop leg-less — the board shows "route unknown".
+ * Records an event only when legs were actually written, so a no-op check
+ * never spams the feed.
+ */
+export async function ensureLegs(user: { id: string; name: string }, tripId: string) {
+  await assertTripRole(tripId, user.id, 'editor');
+  const trip = await getTrip(tripId);
+  if (!trip) throw new NotFoundError();
+  const [pairs, existing] = await Promise.all([
+    legPairs(tripId),
+    db.select({ fromItemId: transportLegs.fromItemId, toItemId: transportLegs.toItemId })
+      .from(transportLegs).where(eq(transportLegs.tripId, tripId)),
+  ]);
+  const missing = missingLegPairs(pairs, existing).slice(0, SYNC_PAIR_CAP);
+  if (!missing.length) return { computed: 0, failed: 0 };
+  let computed = 0, failed = 0;
+  for (const pair of missing) {
+    const r = await computePairLegs(user, tripId, pair);
+    computed += r.computed;
+    failed += r.failed;
+  }
+  if (computed === 0) return { computed, failed };
+  await db.transaction(async (tx) => {
+    await autoChooseLegs(tx, tripId);
+    await recordEvent(tx, {
+      tripId, userId: user.id, verb: 'transport.legs_synced',
+      summary: `${user.name} synced ${computed} route legs${failed ? ` (${failed} unavailable)` : ''}`,
       entityType: 'trip', entityId: tripId,
     });
   });

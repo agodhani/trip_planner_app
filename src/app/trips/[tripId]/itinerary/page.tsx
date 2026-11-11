@@ -45,7 +45,7 @@ export default async function ItineraryPage({ params }: { params: Promise<{ trip
         notes: i.notes, plannedCost: i.plannedCost ? Number(i.plannedCost) : null,
         lat: (i.location as { lat?: number } | null)?.lat ?? null,
         lon: (i.location as { lon?: number } | null)?.lon ?? null,
-        optionId: i.optionId,
+        optionId: i.optionId, durationMin: i.durationMin ?? null,
         hoursNote: i.day && i.optionId
           ? hoursWarning(hoursByOption.get(i.optionId), i.day, i.startTime?.slice(0, 5), i.endTime?.slice(0, 5))?.message ?? null
           : null,

@@ -8,7 +8,7 @@ import { NotFoundError } from '@/lib/services/access';
 import {
   addItem, autoArrange, deleteItem, moveItem, placeItem, syncAnchors, updateItem,
 } from '@/lib/services/itinerary';
-import { addManualLeg, chooseLeg, computeLegs } from '@/lib/services/transport';
+import { addManualLeg, chooseLeg, computeLegs, ensureLegs } from '@/lib/services/transport';
 import type { ActionState } from './people';
 
 const tid = (fd: FormData) => z.string().uuid().parse(fd.get('tripId'));
@@ -127,6 +127,14 @@ export async function autoArrangeAction(formData: FormData): Promise<void> {
   const tripId = tid(formData);
   const { user } = await requireTripRole(tripId, 'editor');
   await autoArrange(user, tripId);
+  ok(tripId);
+}
+
+/** Board fire-and-forget: fills in legs for located pairs that lack one. */
+export async function syncLegsAction(formData: FormData): Promise<void> {
+  const tripId = tid(formData);
+  const { user } = await requireTripRole(tripId, 'editor');
+  await ensureLegs(user, tripId);
   ok(tripId);
 }
 

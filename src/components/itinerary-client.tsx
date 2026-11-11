@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState, useEffect, useRef, useState, type ReactNode } from 'react';
+import Link from 'next/link';
+import { useActionState, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   DndContext, DragOverlay, KeyboardSensor, PointerSensor, closestCenter,
@@ -11,17 +12,19 @@ import {
   SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import {
-  BedDouble, Bus, Footprints, GripVertical, Lock, LockOpen, LogOut, MapPin, Pencil, Plane, PlaneLanding,
-  Printer, Sparkles, StickyNote, Trash2, TriangleAlert, Utensils, type LucideIcon,
+  BedDouble, Bus, Footprints, GripVertical, Lock, LockOpen, LogOut, Map as MapIcon, MapPin, Pencil, Plane,
+  PlaneLanding, Printer, Sparkles, StickyNote, Trash2, TriangleAlert, Utensils, type LucideIcon,
 } from 'lucide-react';
 import {
   addItemAction, autoArrangeAction, deleteItemAction, moveItemAction, placeItemAction,
-  syncAnchorsAction, updateItemAction,
+  syncAnchorsAction, syncLegsAction, updateItemAction,
 } from '@/lib/actions/itinerary';
 import type { ActionState } from '@/lib/actions/people';
+import { DayMap } from '@/components/day-map';
 import { ui, HiddenIds } from '@/components/shortlisted-options';
 import { SubmitButton } from '@/components/submit-button';
 import { ToastProvider, useToast } from '@/components/toaster';
+import { dayTiming } from '@/lib/domain/day-timing';
 import { computeDrop, orderDay, type DropResult } from '@/lib/domain/itinerary';
 import { dayLabel, money, plural } from '@/lib/ui-format';
 
@@ -34,7 +37,7 @@ type Item = {
   locked: boolean; system: boolean; unplanned: boolean;
   notes: string | null; plannedCost: number | null;
   lat: number | null; lon: number | null; optionId: string | null;
-  hoursNote: string | null;
+  durationMin: number | null; hoursNote: string | null;
 };
 type Leg = { id: string; fromItemId: string; toItemId: string; mode: string; durationMin: number | null; summary: string | null; deepLink: string | null; chosen: boolean };
 type PoolOption = { id: string; title: string; lat: number | null; lon: number | null; closedDays: string[]; closedNote: string | null };
@@ -173,9 +176,10 @@ function SortableCard(props: { it: Item; canEdit: boolean; tripId: string; days:
 }
 
 /** A board column (one day, or the unscheduled pool) — itself a drop target. */
-function Column({ day, heading, count, children, itemIds, isPool }: {
+function Column({ day, heading, count, children, itemIds, isPool, mapToggle, mapPanel }: {
   day: string | null; heading: ReactNode; count: number;
   children: ReactNode; itemIds: string[]; isPool?: boolean;
+  mapToggle?: ReactNode; mapPanel?: ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: colId(day) });
   return (
@@ -185,10 +189,14 @@ function Column({ day, heading, count, children, itemIds, isPool }: {
         isOver ? 'border-teal-400 ring-2 ring-teal-600/25' : isPool ? 'border-dashed border-neutral-300' : 'border-neutral-200'
       } bg-white`}
     >
-      <h2 className="font-semibold">
-        {heading}
-        <span aria-hidden="true" className="ml-2 rounded-full bg-neutral-100 px-1.5 text-xs font-medium text-neutral-600">{count}</span>
-      </h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="font-semibold">
+          {heading}
+          <span aria-hidden="true" className="ml-2 rounded-full bg-neutral-100 px-1.5 text-xs font-medium text-neutral-600">{count}</span>
+        </h2>
+        {mapToggle}
+      </div>
+      {mapPanel}
       <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
         {children}
       </SortableContext>
@@ -215,8 +223,11 @@ function ItineraryBoard({ tripId, canEdit, days, items, legs, pool, currency }: 
   const [aState, aAction] = useActionState<ActionState, FormData>(addItemAction, {});
   const [itemsState, setItemsState] = useState<Item[]>(items);
   const [activeItem, setActiveItem] = useState<Item | null>(null);
+  const [openMaps, setOpenMaps] = useState<ReadonlySet<string>>(new Set());
   const pendingOps = useRef(0);
   const propItems = useRef(items);
+  const legSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const legSyncBusy = useRef(false);
 
   // Server props win once optimistic mutations have drained.
   useEffect(() => {
@@ -224,12 +235,45 @@ function ItineraryBoard({ tripId, canEdit, days, items, legs, pool, currency }: 
     if (pendingOps.current === 0) setItemsState(items);
   }, [items]);
 
+  /**
+   * Trailing-edge debounce (~800ms) for leg sync: a burst of drags/edits
+   * coalesces into one call, and at most one sync runs at a time (a busy
+   * timer re-arms once). The server side is a cheap no-op check when nothing
+   * is missing, and never records an event unless legs were actually written.
+   */
+  const scheduleRef = useRef<() => void>(() => {});
+  const scheduleLegSync = useCallback(() => {
+    if (!canEdit) return;
+    if (legSyncTimer.current) clearTimeout(legSyncTimer.current);
+    legSyncTimer.current = setTimeout(() => {
+      legSyncTimer.current = null;
+      if (legSyncBusy.current) { scheduleRef.current(); return; }
+      legSyncBusy.current = true;
+      const fd = new FormData(); fd.set('tripId', tripId);
+      void syncLegsAction(fd)
+        .catch(() => undefined)
+        .then(() => { legSyncBusy.current = false; router.refresh(); });
+    }, 800);
+  }, [canEdit, tripId, router]);
+  useEffect(() => { scheduleRef.current = scheduleLegSync; }, [scheduleLegSync]);
+
   useEffect(() => {
     if (synced.current || !canEdit) return;
     synced.current = true;
     const fd = new FormData(); fd.set('tripId', tripId);
-    void syncAnchorsAction(fd).then(() => router.refresh());
+    // Anchors first so their located pairs exist when legs sync.
+    void syncAnchorsAction(fd)
+      .then(() => syncLegsAction(fd))
+      .then(() => router.refresh());
   }, [tripId, canEdit, router]);
+
+  // Any post-mount change to server items (add/delete/move/reorder) may have
+  // created a new located consecutive pair — schedule a debounced leg sync.
+  const sawItems = useRef(false);
+  useEffect(() => {
+    if (!sawItems.current) { sawItems.current = true; return; }
+    scheduleLegSync();
+  }, [items, scheduleLegSync]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -320,7 +364,10 @@ function ItineraryBoard({ tripId, canEdit, days, items, legs, pool, currency }: 
     void place(itemId, drop, undo).catch(() => {
       setItemsState(before);
       toast.push('Could not move that item — change reverted.');
-    }).finally(finishOp);
+    }).finally(() => {
+      finishOp();
+      scheduleLegSync();
+    });
   }
 
   function handleDragStart(e: DragStartEvent) {
@@ -371,6 +418,12 @@ function ItineraryBoard({ tripId, canEdit, days, items, legs, pool, currency }: 
 
   const dayOptions = days.map((d, i) => <option key={d} value={d}>Day {i + 1} · {dayLabel(d)}</option>);
 
+  const toggleMap = (d: string) => setOpenMaps((cur) => {
+    const next = new Set(cur);
+    if (next.has(d)) next.delete(d); else next.add(d);
+    return next;
+  });
+
   return (
     <div className="flex flex-col gap-6">
       <section className={card} data-no-print>
@@ -412,23 +465,61 @@ function ItineraryBoard({ tripId, canEdit, days, items, legs, pool, currency }: 
         <div className="flex items-start gap-3 overflow-x-auto pb-2" data-no-print>
           {days.map((d, di) => {
             const col = columnItems(d);
+            const flags = dayTiming(col, legs);
+            const located = col
+              .filter((i): i is Item & { lat: number; lon: number } => i.lat != null && i.lon != null)
+              .map((i, n) => ({ id: i.id, lat: i.lat, lon: i.lon, title: i.title, n: n + 1 }));
+            const mapOpen = openMaps.has(d);
             return (
               <Column
                 key={d} day={d} itemIds={col.map((i) => i.id)} count={col.length}
                 heading={<><span className="mr-1 text-xs font-medium uppercase tracking-wide text-teal-700">Day {di + 1}</span> · {dayLabel(d)}</>}
+                mapToggle={located.length >= 2 ? (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded-md border border-neutral-200 px-1.5 py-0.5 text-xs font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-800"
+                    aria-expanded={mapOpen}
+                    aria-label={`Toggle map for Day ${di + 1}`}
+                    title="Show located items in order on a map"
+                    onClick={() => toggleMap(d)}
+                  >
+                    <MapIcon aria-hidden className="h-3 w-3" />Map
+                  </button>
+                ) : undefined}
+                mapPanel={mapOpen && located.length >= 2 ? <DayMap points={located} /> : undefined}
               >
                 {col.map((it, i, arr) => (
                   <div key={it.id}>
                     <SortableCard it={it} canEdit={canEdit} tripId={tripId} days={days} currency={currency} onDelete={applyDelete} />
                     {i < arr.length - 1 && (() => {
-                      const leg = legBetween(it, arr[i + 1]);
-                      return leg ? (
-                        <p className="mx-3 flex items-center gap-1 border-l-2 border-dashed border-neutral-300 py-1 pl-3 text-xs text-neutral-500">
-                          <Footprints aria-hidden className="h-3 w-3" />
-                          {leg.mode}{leg.durationMin != null ? ` · ${leg.durationMin} min` : ''}{leg.summary ? ` · ${leg.summary}` : ''}
-                          {leg.deepLink && <> · <a href={leg.deepLink} target="_blank" rel="noopener noreferrer" className="text-teal-700 underline">directions</a></>}
-                        </p>
-                      ) : null;
+                      const next = arr[i + 1];
+                      const leg = legBetween(it, next);
+                      const pairLocated = it.lat != null && it.lon != null && next.lat != null && next.lon != null;
+                      if (!leg && !pairLocated) return null; // items never had locations — stay silent
+                      const flag = flags.find((f) => f.fromId === it.id && f.toId === next.id);
+                      return (
+                        <>
+                          {leg ? (
+                            <p className="mx-3 flex items-center gap-1 border-l-2 border-dashed border-neutral-300 py-1 pl-3 text-xs text-neutral-500">
+                              <Footprints aria-hidden className="h-3 w-3" />
+                              {leg.mode}{leg.durationMin != null ? ` · ${leg.durationMin} min` : ''}{leg.summary ? ` · ${leg.summary}` : ''}
+                              {leg.deepLink && <> · <a href={leg.deepLink} target="_blank" rel="noopener noreferrer" className="text-teal-700 underline">directions</a></>}
+                            </p>
+                          ) : (
+                            <p className="mx-3 flex items-center gap-1 border-l-2 border-dashed border-neutral-200 py-1 pl-3 text-xs text-neutral-400">
+                              <Footprints aria-hidden className="h-3 w-3" />
+                              route unknown
+                              {canEdit && <> — <Link href={`/trips/${tripId}/transport`} className="text-teal-700 underline">add one</Link></>}
+                            </p>
+                          )}
+                          {flag && (
+                            <p className="mx-3 flex items-center gap-1 border-l-2 border-amber-300 py-1 pl-3 text-xs text-amber-700">
+                              <TriangleAlert aria-hidden className="h-3 w-3 shrink-0" />
+                              Tight connection — needs ~{flag.neededMin} min, {Math.max(0, flag.availableMin)} available
+                            </p>
+                          )}
+                        </>
+                      );
                     })()}
                   </div>
                 ))}
